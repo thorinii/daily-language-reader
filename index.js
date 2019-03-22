@@ -6,11 +6,16 @@ const Database = require('better-sqlite3')
 
 async function main () {
   const db = new Database('database.sqlite3')
-  installDb(db)
-  await extractTextIntoDb(db)
-  addIndexes(db)
 
-  console.log(db.prepare('select text_lemma, COUNT(*), MAX(verse_number) from text_words GROUP BY text_lemma HAVING COUNT(*) > 2 ORDER BY COUNT(*) DESC;').all())
+  if (!db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name = 'text_words' ORDER BY name;`).get()) {
+    installDb(db)
+    await extractTextIntoDb(db)
+    addIndexes(db)
+  }
+
+  console.log(db.prepare('select text_lemma, COUNT(*) from text_words GROUP BY text_lemma HAVING COUNT(*) > 800 ORDER BY COUNT(*) DESC;').all())
+  console.log(db.prepare('select text, gloss_interlinear, clause_id from text_words WHERE book_id = 64 AND verse_number = 2 ORDER BY id ASC;').all())
+  console.log(db.prepare('select text, MAX(length(text)) len from text_words GROUP BY text ORDER BY len DESC LIMIT 10;').all())
 
   db.close()
 }
