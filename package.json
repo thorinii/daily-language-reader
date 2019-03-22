@@ -1,0 +1,11 @@
+{
+  "name": "gnt-reader",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Lachlan Phillips <flipsidelachy@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^5.4.0",
+    "csv-parser": "^2.2.0"
+  }
+}
