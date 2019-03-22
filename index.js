@@ -15,8 +15,8 @@ async function main () {
     addIndexes(db)
   }
 
-  console.log(db.prepare('select text_lemma, COUNT(*) from text_words GROUP BY text_lemma HAVING COUNT(*) > 800 ORDER BY COUNT(*) DESC;').all())
-  console.log(db.prepare('select text, gloss_interlinear, clause_id from text_words WHERE book_id = 64 AND verse_number = 2 ORDER BY id ASC;').all())
+  console.log(db.prepare('select text_lemma, COUNT(*) from text_words WHERE book_id = 64 GROUP BY text_lemma ORDER BY COUNT(*) DESC LIMIT 20;').all())
+  console.log(db.prepare('select text, gloss_interlinear, sentence_id, clause_id from text_words WHERE book_id = 64 AND verse_number = 2 ORDER BY id ASC;').all())
   console.log(db.prepare('select text, MAX(length(text)) len from text_words GROUP BY text ORDER BY len DESC LIMIT 10;').all())
 
   const app = express()
@@ -32,6 +32,79 @@ async function main () {
   app.get('/api/text', (req, res) => {
     const wordsOfVerse = db.prepare('select id, text, text_lemma, gloss_interlinear, book_id, chapter_number, verse_number, paragraph_id, sentence_id, clause_id from text_words WHERE book_id = 64 AND verse_number = 2 ORDER BY id ASC;').all()
     res.json(wordsOfVerse)
+  })
+  app.get('/test', (req, res) => {
+    const wordsOfVerse = db.prepare('select id, text, text_lemma, gloss_interlinear, book_id, chapter_number, verse_number, paragraph_id, sentence_id, clause_id from text_words WHERE book_id = 64 AND verse_number = 2 ORDER BY id ASC;').all()
+
+    function generate (words, useAnnotations) {
+      let text = ''
+      let currentVerse = null
+      let currentParagraph = null
+      let currentSentence = null
+
+      words.forEach(word => {
+        if (currentParagraph !== word.paragraph_id) {
+          currentParagraph = word.paragraph_id
+          if (text.length > 0) text += '</p>'
+          text += '<p>'
+        }
+        if (currentSentence && currentSentence !== word.sentence_id) {
+          currentSentence = word.sentence_id
+          text += '<span class="sentence-break"></span>'
+        } else if (!currentSentence) currentSentence = word.sentence_id
+
+        if (currentVerse !== word.verse_number) {
+          // TODO: this doesn't work on same verse #s from different books
+          currentVerse = word.verse_number
+          text += '<span class="verse-number">' + word.verse_number + '&nbsp;</span>'
+        }
+
+        if (useAnnotations) {
+          text += `<span class="annotation-cell"><span class="original">${word.text}</span><span class="interlinear">${word.gloss_interlinear}</span></span> `
+        } else {
+          text += word.text + ' '
+        }
+      })
+
+      text = text.trim()
+      if (text.length > 0) text += '</p>'
+      return text
+    }
+
+    res.contentType('html').send(`
+<html>
+  <head>
+    <meta charset="utf8">
+
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Cardo" rel="stylesheet">
+
+    <link rel="stylesheet" href="reading.css">
+  </head>
+
+  <body>
+    <div class="application">
+
+      <div>Large reader</div>
+      <div class="reader show-verse-numbers ${ wordsOfVerse.length > 20 ? '' : 'large'}">
+        <h1 class="reader-reference">ΙΩΑΝΝΟΥ Γ</h1>
+
+        <div class="reader-text break-paragraphs">
+          ${generate(wordsOfVerse, false)}
+        </div>
+      </div>
+
+      <div>Annotated reader</div>
+      <div class="reader show-verse-numbers large annotated">
+        <h1 class="reader-reference">ΙΩΑΝΝΟΥ Γ</h1>
+
+        <div class="reader-text break-paragraphs">
+          ${generate(wordsOfVerse, true)}
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`)
   })
 
   app.use(function (err, req, res, next) {
@@ -129,13 +202,6 @@ function extractTextIntoDb (db) {
         const leftPunctuation = extractPunctuation(data['PMpWord'])
         const rightPunctuation = extractPunctuation(data['PMfWord'])
 
-        if (rightPunctuation.includes('¶')) {
-          paragraphCounter++
-        }
-        if (rightPunctuation.includes('.')) {
-          sentenceCounter++
-        }
-
         const wordId = parseInt(data['OGNTsort'])
 
         const text = leftPunctuation + data['OGNTa'] + rightPunctuation.filter(p => p !== '¶')
@@ -152,6 +218,13 @@ function extractTextIntoDb (db) {
 
         const glossWord = data['TBESG']
         const glossInterlinear = data['LT']
+
+        if (rightPunctuation.includes('¶')) {
+          paragraphCounter++
+        }
+        if (rightPunctuation.includes('.')) {
+          sentenceCounter++
+        }
 
         console.log({ bookId, paragraphId,  wordId, text })
         insertStatement.run(
