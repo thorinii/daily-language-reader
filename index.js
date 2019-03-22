@@ -6,13 +6,8 @@ main().then(null, e => console.error('Crash', e))
 
 
 async function main () {
-  // const filename = process.argv[2] || '85-3Jn.txt'
-  // console.log(await promisify(fs.readdir)(path.join(__dirname, 'rawtexts')))
-
-  // const phrases = await loadBookPhrases(filename)
-
   const bookFiles = (await promisify(fs.readdir)(path.join(__dirname, 'rawtexts')))
-    .filter(f => /^[0-9]+/.test(f) && !f.endsWith('-APP.txt'))
+    .filter(f => /^[0-9]+/.test(f) && f.endsWith('-morphgnt.txt'))
 
   const bookPhrasePs = bookFiles.map(bf => loadBookPhrases(bf))
 
@@ -21,7 +16,7 @@ async function main () {
   const freq1Map = new Map()
   phrases.forEach(phrase => {
     phrase.forEach(word => {
-      const key = word.word
+      const key = word.lemma
       freq1Map.set(key, freq1Map.has(key) ? freq1Map.get(key) + 1 : 1)
     })
   })
@@ -33,7 +28,7 @@ async function main () {
     let prev = null
     phrase.forEach(word => {
       if (prev !== null) {
-        const key = prev.word + ' ' + word.word
+        const key = prev.lemma + ' ' + word.lemma
         freq2Map.set(key, freq2Map.has(key) ? freq2Map.get(key) + 1 : 1)
       }
       prev = word
@@ -41,6 +36,28 @@ async function main () {
   })
   const freq2 = [...freq2Map.entries()].sort((a, b) => a[1] > b[1] ? -1 : 1).slice(0, 30)
   console.log(freq2)
+
+  const freq3Map = new Map()
+  const freq3RawMap = new Map()
+  phrases.forEach(phrase => {
+    let prev1 = null
+    let prev2 = null
+    phrase.forEach(word => {
+      if (prev1 !== null) {
+        const key = prev1.lemma + ' ' + prev2.lemma + ' ' + word.lemma
+        freq3Map.set(key, freq3Map.has(key) ? freq3Map.get(key) + 1 : 1)
+
+        let arr;
+        if (!freq3RawMap.has(key)) freq3RawMap.set(key, arr = [])
+        else arr = freq3RawMap.get(key)
+        arr.push(prev1.text + ' ' + prev2.text + ' ' + word.text)
+      }
+      prev1 = prev2
+      prev2 = word
+    })
+  })
+  const freq3 = [...freq3Map.entries()].sort((a, b) => a[1] > b[1] ? -1 : 1).slice(0, 30)
+  console.log(freq3.map(fq => ({ key: fq[0], fq: fq[1], examples: freq3RawMap.get(fq[0]).slice(0, 4) })))
 }
 
 
@@ -49,36 +66,37 @@ async function loadBookPhrases (filename) {
   const contents = (await promisify(fs.readFile)(filePath, 'utf8'))
 
   const lines = contents.split('\n').map(l => l.trim()).filter(l => !!l)
-  const bookName = lines[0]
+  const rawVerses = lines
 
-  const rawVerses = lines.slice(1)
-
-  const verses = rawVerses.map(line => {
-    const split = line.split('\t')
-    const reference = split[0]
-    const text = split[1]
-    return [reference, text]
+  const words = rawVerses.map(line => {
+    const split = line.split(' ')
+    const [reference, partOfSpeech, parsing, text, word, normalised, lemma] = split
+    return { reference, text, word, lemma }
   })
-
-  const wordsAndPunctuation = [].concat(...verses.map(verse => {
-    const split = verse[1].replace(/⸀/g, '').replace(/·/g, ' ·').replace(/\./g, ' .').replace(/,/g, ' ,').split(' ')
-    return split.map((word, idx) => {
-      if (word === '.' || word === ',' || word === '·') return { punctuator: word }
-      return { word, reference: verse[0], verseIndex: idx }
-    })
-  }))
 
   const phrases = []
   let tmp = []
-  wordsAndPunctuation.forEach(w => {
-    if (w.punctuator) {
+  words.forEach(w => {
+    const isPunctuated = w.text !== w.word
+    const isStartPunctuated = isPunctuated && w.text.endsWith(w.word)
+    const isEndPunctuated = isPunctuated && w.text.startsWith(w.word)
+
+    if (isStartPunctuated) {
       if (tmp.length > 0) phrases.push(tmp)
       tmp = []
-    } else {
-      w.phraseIndex = tmp.length
-      tmp.push(w)
+    }
+
+    w.phraseIndex = tmp.length
+    tmp.push(w)
+
+    if (isEndPunctuated || (!isStartPunctuated && isPunctuated)) {
+      if (tmp.length > 0) phrases.push(tmp)
+      tmp = []
     }
   })
+  // console.log(phrases)
+
+  if (tmp.length > 0) phrases.push(tmp)
 
   return phrases
 }
