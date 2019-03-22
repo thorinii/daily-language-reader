@@ -2,6 +2,19 @@ html {
   font-size: 20px;
 }
 
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+.application {
+  padding: 8px;
+  height: 100%;
+  box-sizing: border-box;
+
+  background-color: #eae8e4;
+}
+
 
 .reader {
   max-width: 50em;
@@ -10,11 +23,13 @@ html {
 
 .reader-reference {
   font-family: 'Roboto', sans-serif;
+  color: #9c772e;
 }
 
 .reader-text {
   font-family: 'Cardo', serif;
   line-height: 2;
+  color: #210f04;
 }
 
 .large .reader-text {
@@ -63,7 +78,7 @@ html {
 }
 
 .annotation-cell:hover {
-  background-color: #FFFADD;
+  background-color: #e3d7d0;
 }
 
 .annotation-cell .original, .annotation-cell .interlinear {
