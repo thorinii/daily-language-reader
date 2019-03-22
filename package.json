@@ -6,6 +6,8 @@
   "license": "MIT",
   "dependencies": {
     "better-sqlite3": "^5.4.0",
-    "csv-parser": "^2.2.0"
+    "body-parser": "^1.18.3",
+    "csv-parser": "^2.2.0",
+    "express": "^4.16.4"
   }
 }

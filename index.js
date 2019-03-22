@@ -1,7 +1,9 @@
 const fs = require('fs')
 const path = require('path')
 
+const bodyParser = require('body-parser')
 const csv = require('csv-parser')
+const express = require('express')
 const Database = require('better-sqlite3')
 
 async function main () {
@@ -17,7 +19,34 @@ async function main () {
   console.log(db.prepare('select text, gloss_interlinear, clause_id from text_words WHERE book_id = 64 AND verse_number = 2 ORDER BY id ASC;').all())
   console.log(db.prepare('select text, MAX(length(text)) len from text_words GROUP BY text ORDER BY len DESC LIMIT 10;').all())
 
-  db.close()
+  const app = express()
+  app.use(bodyParser.json())
+  app.use(bodyParser.urlencoded({ extended: true }))
+
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'layouttest.html'))
+  })
+  app.get('/reading.css', (req, res) => {
+    res.sendFile(path.join(__dirname, 'reading.css'))
+  })
+  app.get('/api/text', (req, res) => {
+    const wordsOfVerse = db.prepare('select id, text, text_lemma, gloss_interlinear, book_id, chapter_number, verse_number, paragraph_id, sentence_id, clause_id from text_words WHERE book_id = 64 AND verse_number = 2 ORDER BY id ASC;').all()
+    res.json(wordsOfVerse)
+  })
+
+  app.use(function (err, req, res, next) {
+    console.error(err)
+    res.status(500).json({ error: err })
+  })
+
+  app.listen(3000, function () {
+    console.log('Started GNTReader on port 3000')
+  })
+
+  process.on('exit', () => db.close());
+  process.on('SIGHUP', () => process.exit(128 + 1));
+  process.on('SIGINT', () => process.exit(128 + 2));
+  process.on('SIGTERM', () => process.exit(128 + 15));
 }
 
 function installDb (db) {
