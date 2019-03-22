@@ -1,0 +1,52 @@
+html {
+  font-size: 20px;
+}
+
+
+.reader {
+  max-width: 50em;
+  margin: auto;
+}
+
+.reader-reference {
+  font-family: 'Roboto', sans-serif;
+}
+
+.reader-text {
+  font-family: 'Cardo', serif;
+  line-height: 2;
+}
+
+
+.verse-number {
+  display: none;
+
+  margin-left: 0.6em;
+
+  font-size: 0.8em;
+  font-weight: bold;
+  color: #999999;
+}
+
+.show-verse-numbers .verse-number {
+  display: initial;
+}
+
+.break-verses .verse-number::before {
+  content: ' ';
+  display: block;
+}
+
+
+.break-sentences .sentence-break {
+  display: block;
+  margin-bottom: 1em;
+}
+
+.reader p {
+  display: inline;
+}
+
+.reader .break-paragraphs p {
+  display: block;
+}
