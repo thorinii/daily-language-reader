@@ -17,6 +17,10 @@ html {
   line-height: 2;
 }
 
+.large .reader-text {
+  font-size: 1.5em;
+}
+
 
 .verse-number {
   display: none;
@@ -49,4 +53,25 @@ html {
 
 .reader .break-paragraphs p {
   display: block;
+}
+
+
+.annotation-cell {
+  display: inline-block;
+  text-align: center;
+  margin: 0 0.5em;
+}
+
+.annotation-cell:hover {
+  background-color: #FFFADD;
+}
+
+.annotation-cell .original, .annotation-cell .interlinear {
+  display: block;
+}
+
+.annotation-cell .interlinear {
+  margin-top: -0.6em;
+  font-size: 0.7em;
+  color: #555555;
 }
