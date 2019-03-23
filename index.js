@@ -176,8 +176,7 @@ function installDb (db) {
       length INTEGER NOT NULL,
       unique_length INTEGER NOT NULL,
       average_form_cost DOUBLE NOT NULL,
-      total_unique_form_cost DOUBLE NOT NULL,
-      geometric_unique_form_cost DOUBLE NOT NULL
+      total_unique_form_cost DOUBLE NOT NULL
     );
 
     CREATE TABLE text_clause (
@@ -186,8 +185,7 @@ function installDb (db) {
       length INTEGER NOT NULL,
       unique_length INTEGER NOT NULL,
       average_form_cost DOUBLE NOT NULL,
-      total_unique_form_cost DOUBLE NOT NULL,
-      geometric_unique_form_cost DOUBLE NOT NULL
+      total_unique_form_cost DOUBLE NOT NULL
     );
 
     CREATE TABLE stat_clause (
@@ -245,8 +243,8 @@ function addIndexes (db) {
 
   console.log('indexing all sentences')
   db.prepare(`
-    INSERT INTO text_sentence (id, length, unique_length, average_form_cost, total_unique_form_cost, geometric_unique_form_cost)
-      SELECT sentence_id, COUNT(*), 0, 0, 0, 0
+    INSERT INTO text_sentence (id, length, unique_length, average_form_cost, total_unique_form_cost)
+      SELECT sentence_id, COUNT(*), 0, 0, 0
       FROM text_words
       GROUP BY sentence_id;`).run()
   db.prepare(`
@@ -263,13 +261,12 @@ function addIndexes (db) {
   db.exec(`CREATE INDEX text_sentence_unique_length ON text_sentence (unique_length);`)
   db.exec(`CREATE INDEX text_sentence_average_form_cost ON text_sentence (average_form_cost);`)
   db.exec(`CREATE INDEX text_sentence_total_unique_form_cost ON text_sentence (total_unique_form_cost);`)
-  db.exec(`CREATE INDEX text_sentence_geometric_unique_form_cost ON text_sentence (geometric_unique_form_cost);`)
 
 
   console.log('indexing all clauses')
   db.prepare(`
-    INSERT INTO text_clause (id, length, unique_length, average_form_cost, total_unique_form_cost, geometric_unique_form_cost)
-      SELECT clause_id, COUNT(*), 0, 0, 0, 0
+    INSERT INTO text_clause (id, length, unique_length, average_form_cost, total_unique_form_cost)
+      SELECT clause_id, COUNT(*), 0, 0, 0
       FROM text_words
       GROUP BY clause_id;`).run()
   db.prepare(`
@@ -286,7 +283,6 @@ function addIndexes (db) {
   db.exec(`CREATE INDEX text_clause_unique_length ON text_clause (unique_length);`)
   db.exec(`CREATE INDEX text_clause_average_form_cost ON text_clause (average_form_cost);`)
   db.exec(`CREATE INDEX text_clause_total_unique_form_cost ON text_clause (total_unique_form_cost);`)
-  db.exec(`CREATE INDEX text_clause_geometric_unique_form_cost ON text_clause (geometric_unique_form_cost);`)
 
 
   console.log('indexing clause forms')
@@ -310,7 +306,7 @@ function updateCosts (db) {
 
   db.prepare(`UPDATE stat_form SET cost = raw_frequency_cost + 10;`).run()
   // TODO: mark known words like so:
-  //   console.log(db.prepare(`UPDATE stat_form SET cost = 1 WHERE text = ?;`).run('εὐοδοῦταί'))
+  //   console.log(db.prepare(`UPDATE stat_form SET cost = 0 WHERE text = ?;`).run('εὐοδοῦταί'))
   db.prepare(`
     UPDATE stat_form SET cost = min(cost, cost * 0.01 + 0.99 * (
       SELECT min(cheapest.cost)
@@ -360,18 +356,6 @@ LIMIT 50
           GROUP BY text_lone) AS unique_words
         JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
 
-  db.prepare(`
-    UPDATE text_sentence
-    SET geometric_unique_form_cost = (
-      SELECT mul(rfc.cost) FROM (
-        SELECT text_lone, cost
-        FROM (
-          SELECT text_lone
-          FROM text_words
-          WHERE sentence_id = text_sentence.id
-          GROUP BY text_lone) AS unique_words
-        JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
-
 
   db.prepare(`
     UPDATE text_clause
@@ -389,18 +373,6 @@ LIMIT 50
     UPDATE text_clause
     SET total_unique_form_cost = (
       SELECT sum(rfc.cost) FROM (
-        SELECT text_lone, cost
-        FROM (
-          SELECT text_lone
-          FROM text_words
-          WHERE clause_id = text_clause.id
-          GROUP BY text_lone) AS unique_words
-        JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
-
-  db.prepare(`
-    UPDATE text_clause
-    SET geometric_unique_form_cost = (
-      SELECT mul(rfc.cost) FROM (
         SELECT text_lone, cost
         FROM (
           SELECT text_lone
@@ -438,18 +410,6 @@ LIMIT 50
       LIMIT 5)
     GROUP BY sentence_id`).all())
 
-  console.log('by geometric raw form frequency cost')
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE sentence_id IN (
-      SELECT id
-      FROM text_sentence
-      WHERE length > 2
-      ORDER BY geometric_unique_form_cost
-      LIMIT 5)
-    GROUP BY sentence_id`).all())
-
 
   console.log('highest frequency clauses')
   console.log(db.prepare(`
@@ -483,18 +443,6 @@ LIMIT 50
       FROM stat_clause
       JOIN text_clause ON text_clause.id = stat_clause.example_id
       ORDER BY total_unique_form_cost
-      LIMIT 10)
-    GROUP BY clause_id`).all())
-
-  console.log('by geometric raw form frequency cost')
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE clause_id IN (
-      SELECT example_id
-      FROM stat_clause
-      JOIN text_clause ON text_clause.id = stat_clause.example_id
-      ORDER BY geometric_unique_form_cost
       LIMIT 10)
     GROUP BY clause_id`).all())
 }
@@ -591,7 +539,7 @@ function extractTextIntoDb (db) {
           bookId, chapterNumber, verseNumber, paragraphId, sentenceId, clauseId)
 
         wordCounter++
-        if (wordCounter % 1000 === 0) {
+        if (wordCounter % 5000 === 0) {
           console.log('In book %d, loaded %d words', bookId, wordCounter)
         }
       })
