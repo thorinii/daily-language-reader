@@ -8,16 +8,16 @@ const Database = require('better-sqlite3')
 
 async function main () {
   const db = new Database('database.sqlite3')
+  db.function('sqrt', { deterministic: true }, (a) => Math.sqrt(a))
+  db.function('log', { deterministic: true }, (a) => Math.log(a))
 
   if (!db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name = 'text_words' ORDER BY name;`).get()) {
     installDb(db)
     await extractTextIntoDb(db)
     addIndexes(db)
   }
+  updateCosts(db)
 
-  console.log(db.prepare('select text_lemma, COUNT(*) from text_words WHERE book_id = 64 GROUP BY text_lemma ORDER BY COUNT(*) DESC LIMIT 20;').all())
-  console.log(db.prepare('select text, gloss_interlinear, sentence_id, clause_id from text_words WHERE book_id = 64 AND verse_number = 2 ORDER BY id ASC;').all())
-  console.log(db.prepare('select text, MAX(length(text)) len from text_words GROUP BY text ORDER BY len DESC LIMIT 10;').all())
 
   const app = express()
   app.use(bodyParser.json())
@@ -30,11 +30,11 @@ async function main () {
     res.sendFile(path.join(__dirname, 'reading.css'))
   })
   app.get('/api/text', (req, res) => {
-    const wordsOfVerse = db.prepare('select id, text, text_lemma, gloss_interlinear, book_id, chapter_number, verse_number, paragraph_id, sentence_id, clause_id from text_words WHERE book_id = 64 AND verse_number = 2 ORDER BY id ASC;').all()
+    const wordsOfVerse = db.prepare('select id, text, text_lemma, gloss_interlinear, book_id, chapter_number, verse_number, paragraph_id, sentence_id, clause_id from text_words WHERE book_id = 64 AND verse_number IN (2, 3) ORDER BY id ASC;').all()
     res.json(wordsOfVerse)
   })
   app.get('/test', (req, res) => {
-    const wordsOfVerse = db.prepare('select id, text, text_lemma, gloss_interlinear, book_id, chapter_number, verse_number, paragraph_id, sentence_id, clause_id from text_words WHERE book_id = 64 AND verse_number = 2 ORDER BY id ASC;').all()
+    const wordsOfVerse = db.prepare('select id, text, text_lemma, gloss_interlinear, book_id, chapter_number, verse_number, paragraph_id, sentence_id, clause_id from text_words WHERE book_id = 64 AND verse_number IN (2, 3) ORDER BY id ASC;').all()
 
     function generate (words, useAnnotations) {
       let text = ''
@@ -86,7 +86,7 @@ async function main () {
     <div class="application">
 
       <div>Large reader</div>
-      <div class="reader show-verse-numbers ${ wordsOfVerse.length > 20 ? '' : 'large'}">
+      <div class="reader ${ wordsOfVerse.length > 50 ? '' : 'large'}">
         <h1 class="reader-reference">ΙΩΑΝΝΟΥ Γ</h1>
 
         <div class="reader-text break-paragraphs">
@@ -95,7 +95,7 @@ async function main () {
       </div>
 
       <div>Annotated reader</div>
-      <div class="reader show-verse-numbers large annotated">
+      <div class="reader ${ wordsOfVerse.length > 50 ? '' : 'large'} annotated">
         <h1 class="reader-reference">ΙΩΑΝΝΟΥ Γ</h1>
 
         <div class="reader-text break-paragraphs">
@@ -125,7 +125,7 @@ async function main () {
 function installDb (db) {
   db.exec(`
     CREATE TABLE text_words (
-      id SERIAL,
+      id INTEGER PRIMARY KEY,
 
       text TEXT NOT NULL,
       text_unaccented TEXT NOT NULL,
@@ -142,8 +142,29 @@ function installDb (db) {
       clause_id INTEGER NOT NULL
     );
 
+    CREATE TABLE stat_form (
+      id INTEGER PRIMARY KEY,
+
+      text TEXT NOT NULL,
+      lexeme_id INTEGER NOT NULL,
+
+      gloss_word TEXT NOT NULL,
+
+      frequency INTEGER NOT NULL,
+      raw_frequency_cost DOUBLE NOT NULL
+    );
+
+    CREATE TABLE stat_lexeme (
+      id INTEGER PRIMARY KEY,
+
+      text TEXT NOT NULL,
+
+      frequency INTEGER NOT NULL,
+      raw_frequency_cost DOUBLE NOT NULL
+    );
+
     CREATE TABLE text_clauses (
-      id SERIAL,
+      id INTEGER PRIMARY KEY,
 
       text TEXT NOT NULL,
       text_lemma TEXT NOT NULL,
@@ -155,8 +176,7 @@ function installDb (db) {
 }
 
 function addIndexes (db) {
-  db.exec(`CREATE INDEX text_words_id ON text_words (id);`)
-
+  console.log('creating column indexes')
   db.exec(`CREATE INDEX text_words_text ON text_words (text);`)
   db.exec(`CREATE INDEX text_words_text_unaccented ON text_words (text_unaccented);`)
   db.exec(`CREATE INDEX text_words_text_lemma ON text_words (text_lemma);`)
@@ -167,6 +187,33 @@ function addIndexes (db) {
   db.exec(`CREATE INDEX text_words_paragraph_id ON text_words (paragraph_id);`)
   db.exec(`CREATE INDEX text_words_sentence_id ON text_words (sentence_id);`)
   db.exec(`CREATE INDEX text_words_clause_id ON text_words (clause_id);`)
+
+
+  console.log('creating statistical indexes')
+  db.prepare(`
+    INSERT INTO stat_lexeme (text, frequency, raw_frequency_cost)
+      SELECT text_lemma, COUNT(*) AS frequency, 0
+      FROM text_words
+      GROUP BY text_lemma
+      ORDER BY frequency DESC;`).run()
+  db.prepare(`UPDATE stat_lexeme SET raw_frequency_cost = round(log(id) + 1, 1);`).run()
+
+  db.prepare(`
+    INSERT INTO stat_form (text, lexeme_id, gloss_word, frequency, raw_frequency_cost)
+      SELECT text_unaccented, (SELECT id FROM stat_lexeme WHERE text = text_lemma), gloss_word, COUNT(*) AS frequency, 0
+      FROM text_words
+      GROUP BY text_unaccented
+      ORDER BY frequency DESC;`).run()
+  db.prepare(`UPDATE stat_form SET raw_frequency_cost = round(log(id) + 1, 1);`).run()
+}
+
+function updateCosts (db) {
+  console.log(db.prepare('select id, text, frequency, raw_frequency_cost from stat_lexeme ORDER BY id ASC LIMIT 20;').all())
+
+  console.log(db.prepare('select id, text, frequency, raw_frequency_cost from stat_form ORDER BY id ASC LIMIT 20;').all())
+
+  console.log(db.prepare('select COUNT(*) count, MIN(frequency) freq_low, MAX(frequency) freq_high, round(raw_frequency_cost) cost from stat_lexeme GROUP BY cost ORDER BY cost ASC;').all())
+  console.log(db.prepare('select COUNT(*) count, MIN(frequency) freq_low, MAX(frequency) freq_high, round(raw_frequency_cost) cost from stat_form GROUP BY cost ORDER BY cost ASC;').all())
 }
 
 function extractTextIntoDb (db) {
