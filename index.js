@@ -156,7 +156,8 @@ function installDb (db) {
       gloss_word TEXT NOT NULL,
 
       frequency INTEGER NOT NULL,
-      raw_frequency_cost DOUBLE NOT NULL
+      raw_frequency_cost DOUBLE NOT NULL,
+      cost DOUBLE NOT NULL
     );
 
     CREATE TABLE stat_lexeme (
@@ -165,10 +166,11 @@ function installDb (db) {
       text TEXT NOT NULL,
 
       frequency INTEGER NOT NULL,
-      raw_frequency_cost DOUBLE NOT NULL
+      raw_frequency_cost DOUBLE NOT NULL,
+      cost DOUBLE NOT NULL
     );
 
-    CREATE TABLE stat_sentence (
+    CREATE TABLE text_sentence (
       id INTEGER PRIMARY KEY,
 
       length INTEGER NOT NULL,
@@ -178,14 +180,14 @@ function installDb (db) {
       geometric_unique_form_cost DOUBLE NOT NULL
     );
 
-    CREATE TABLE text_clauses (
+    CREATE TABLE text_clause (
       id INTEGER PRIMARY KEY,
 
-      text TEXT NOT NULL,
-      text_lemma TEXT NOT NULL,
-
-      gloss_word TEXT NOT NULL,
-      gloss_interlinear TEXT NOT NULL
+      length INTEGER NOT NULL,
+      unique_length INTEGER NOT NULL,
+      average_form_cost DOUBLE NOT NULL,
+      total_unique_form_cost DOUBLE NOT NULL,
+      geometric_unique_form_cost DOUBLE NOT NULL
     );
   `)
 }
@@ -207,78 +209,134 @@ function addIndexes (db) {
 
   console.log('creating statistical indexes')
   db.prepare(`
-    INSERT INTO stat_lexeme (text, frequency, raw_frequency_cost)
-      SELECT text_lemma, COUNT(*) AS frequency, 0
+    INSERT INTO stat_lexeme (text, frequency, raw_frequency_cost, cost)
+      SELECT text_lemma, COUNT(*) AS frequency, 0, 0
       FROM text_words
       GROUP BY text_lemma
       ORDER BY frequency DESC;`).run()
   db.prepare(`UPDATE stat_lexeme SET raw_frequency_cost = round(log(id) + 1, 1);`).run()
 
   db.prepare(`
-    INSERT INTO stat_form (text, lexeme_id, gloss_word, frequency, raw_frequency_cost)
-      SELECT text_lone, (SELECT id FROM stat_lexeme WHERE text = text_lemma), gloss_word, COUNT(*) AS frequency, 0
+    INSERT INTO stat_form (text, lexeme_id, gloss_word, frequency, raw_frequency_cost, cost)
+      SELECT text_lone, (SELECT id FROM stat_lexeme WHERE text = text_lemma), gloss_word, COUNT(*) AS frequency, 0, 0
       FROM text_words
       GROUP BY text_lone
       ORDER BY frequency DESC;`).run()
   db.prepare(`UPDATE stat_form SET raw_frequency_cost = round(log(id) + 1, 1);`).run()
 
   db.prepare(`
-    INSERT INTO stat_sentence (id, length, unique_length, average_form_cost, total_unique_form_cost, geometric_unique_form_cost)
+    INSERT INTO text_sentence (id, length, unique_length, average_form_cost, total_unique_form_cost, geometric_unique_form_cost)
       SELECT sentence_id, COUNT(*), 0, 0, 0, 0
       FROM text_words
       GROUP BY sentence_id;`).run()
   db.prepare(`
-    UPDATE stat_sentence
+    UPDATE text_sentence
     SET unique_length = (
       SELECT COUNT(*)
       FROM (
         SELECT text_lone
         FROM text_words
-        WHERE sentence_id = stat_sentence.id
+        WHERE sentence_id = text_sentence.id
+        GROUP BY text_lone));`).run()
+
+  db.prepare(`
+    INSERT INTO text_clause (id, length, unique_length, average_form_cost, total_unique_form_cost, geometric_unique_form_cost)
+      SELECT clause_id, COUNT(*), 0, 0, 0, 0
+      FROM text_words
+      GROUP BY clause_id;`).run()
+  db.prepare(`
+    UPDATE text_clause
+    SET unique_length = (
+      SELECT COUNT(*)
+      FROM (
+        SELECT text_lone
+        FROM text_words
+        WHERE clause_id = text_clause.id
         GROUP BY text_lone));`).run()
 }
 
 function updateCosts (db) {
   console.log('updating costs')
+  db.prepare(`UPDATE stat_lexeme SET cost = raw_frequency_cost;`).run()
+  db.prepare(`UPDATE stat_form SET cost = raw_frequency_cost;`).run()
+
   db.prepare(`
-    UPDATE stat_sentence
+    UPDATE text_sentence
     SET average_form_cost = (
       SELECT round(avg(rfc.cost), 1) FROM (
-        SELECT text_lone, raw_frequency_cost AS cost
+        SELECT text_lone, cost
         FROM (
           SELECT text_lone
           FROM text_words
-          WHERE sentence_id = stat_sentence.id
+          WHERE sentence_id = text_sentence.id
           GROUP BY text_lone) AS unique_words
         JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
 
   db.prepare(`
-    UPDATE stat_sentence
+    UPDATE text_sentence
     SET total_unique_form_cost = (
       SELECT sum(rfc.cost) FROM (
-        SELECT text_lone, raw_frequency_cost AS cost
+        SELECT text_lone, cost
         FROM (
           SELECT text_lone
           FROM text_words
-          WHERE sentence_id = stat_sentence.id
+          WHERE sentence_id = text_sentence.id
           GROUP BY text_lone) AS unique_words
         JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
 
   db.prepare(`
-    UPDATE stat_sentence
+    UPDATE text_sentence
     SET geometric_unique_form_cost = (
       SELECT mul(rfc.cost) FROM (
-        SELECT text_lone, raw_frequency_cost AS cost
+        SELECT text_lone, cost
         FROM (
           SELECT text_lone
           FROM text_words
-          WHERE sentence_id = stat_sentence.id
+          WHERE sentence_id = text_sentence.id
           GROUP BY text_lone) AS unique_words
         JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
 
+
+  db.prepare(`
+    UPDATE text_clause
+    SET average_form_cost = (
+      SELECT round(avg(rfc.cost), 1) FROM (
+        SELECT text_lone, cost
+        FROM (
+          SELECT text_lone
+          FROM text_words
+          WHERE clause_id = text_clause.id
+          GROUP BY text_lone) AS unique_words
+        JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
+
+  db.prepare(`
+    UPDATE text_clause
+    SET total_unique_form_cost = (
+      SELECT sum(rfc.cost) FROM (
+        SELECT text_lone, cost
+        FROM (
+          SELECT text_lone
+          FROM text_words
+          WHERE clause_id = text_clause.id
+          GROUP BY text_lone) AS unique_words
+        JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
+
+  db.prepare(`
+    UPDATE text_clause
+    SET geometric_unique_form_cost = (
+      SELECT mul(rfc.cost) FROM (
+        SELECT text_lone, cost
+        FROM (
+          SELECT text_lone
+          FROM text_words
+          WHERE clause_id = text_clause.id
+          GROUP BY text_lone) AS unique_words
+        JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
+
+
   console.log('by length')
-  console.log(db.prepare('select id, length from stat_sentence ORDER BY length ASC LIMIT 5;').all())
-  console.log(db.prepare('select id, length from stat_sentence ORDER BY length DESC LIMIT 5;').all())
+  console.log(db.prepare('select id, length from text_sentence ORDER BY length ASC LIMIT 5;').all())
+  console.log(db.prepare('select id, length from text_sentence ORDER BY length DESC LIMIT 5;').all())
 
   console.log('by average raw form frequency cost')
   console.log(db.prepare(`
@@ -286,7 +344,7 @@ function updateCosts (db) {
     FROM text_words
     WHERE sentence_id IN (
       SELECT id
-      FROM stat_sentence
+      FROM text_sentence
       WHERE length > 2
       ORDER BY average_form_cost
       LIMIT 3)
@@ -296,7 +354,7 @@ function updateCosts (db) {
     FROM text_words
     WHERE sentence_id IN (
       SELECT id
-      FROM stat_sentence
+      FROM text_sentence
       WHERE length > 2
       ORDER BY average_form_cost DESC
       LIMIT 3)
@@ -308,7 +366,7 @@ function updateCosts (db) {
     FROM text_words
     WHERE sentence_id IN (
       SELECT id
-      FROM stat_sentence
+      FROM text_sentence
       WHERE length > 2
       ORDER BY total_unique_form_cost
       LIMIT 3)
@@ -318,7 +376,7 @@ function updateCosts (db) {
     FROM text_words
     WHERE sentence_id IN (
       SELECT id
-      FROM stat_sentence
+      FROM text_sentence
       WHERE length < 20
       ORDER BY total_unique_form_cost DESC
       LIMIT 3)
@@ -330,7 +388,7 @@ function updateCosts (db) {
     FROM text_words
     WHERE sentence_id IN (
       SELECT id
-      FROM stat_sentence
+      FROM text_sentence
       WHERE length > 2
       ORDER BY geometric_unique_form_cost
       LIMIT 3)
@@ -340,11 +398,82 @@ function updateCosts (db) {
     FROM text_words
     WHERE sentence_id IN (
       SELECT id
-      FROM stat_sentence
+      FROM text_sentence
       WHERE length < 20
       ORDER BY geometric_unique_form_cost DESC
       LIMIT 3)
     GROUP BY sentence_id`).all())
+
+
+  console.log('by length')
+  console.log(db.prepare('select id, length from text_clause ORDER BY length ASC LIMIT 5;').all())
+  console.log(db.prepare('select id, length from text_clause ORDER BY length DESC LIMIT 5;').all())
+
+  console.log('by average raw form frequency cost')
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE clause_id IN (
+      SELECT id
+      FROM text_clause
+      WHERE length > 2
+      ORDER BY average_form_cost
+      LIMIT 3)
+    GROUP BY clause_id`).all())
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE clause_id IN (
+      SELECT id
+      FROM text_clause
+      WHERE length > 2
+      ORDER BY average_form_cost DESC
+      LIMIT 3)
+    GROUP BY clause_id`).all())
+
+  console.log('by total raw form frequency cost')
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE clause_id IN (
+      SELECT id
+      FROM text_clause
+      WHERE length > 2
+      ORDER BY total_unique_form_cost
+      LIMIT 3)
+    GROUP BY clause_id`).all())
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE clause_id IN (
+      SELECT id
+      FROM text_clause
+      WHERE length < 20
+      ORDER BY total_unique_form_cost DESC
+      LIMIT 3)
+    GROUP BY clause_id`).all())
+
+  console.log('by geometric raw form frequency cost')
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE clause_id IN (
+      SELECT id
+      FROM text_clause
+      WHERE length > 2
+      ORDER BY geometric_unique_form_cost
+      LIMIT 3)
+    GROUP BY clause_id`).all())
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE clause_id IN (
+      SELECT id
+      FROM text_clause
+      WHERE length < 20
+      ORDER BY geometric_unique_form_cost DESC
+      LIMIT 3)
+    GROUP BY clause_id`).all())
 }
 
 function extractTextIntoDb (db) {
