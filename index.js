@@ -223,7 +223,7 @@ function addIndexes (db) {
       FROM text_words
       GROUP BY text_lemma
       ORDER BY frequency DESC;`).run()
-  db.prepare(`UPDATE stat_lexeme SET raw_frequency_cost = round(sqrt(id), 1);`).run()
+  db.prepare(`UPDATE stat_lexeme SET raw_frequency_cost = sqrt(id);`).run()
 
   db.exec(`CREATE INDEX stat_lexeme_text ON stat_lexeme (text);`)
   db.exec(`CREATE INDEX stat_lexeme_cost ON stat_lexeme (cost);`)
@@ -236,7 +236,7 @@ function addIndexes (db) {
       FROM text_words
       GROUP BY text_lone
       ORDER BY frequency DESC;`).run()
-  db.prepare(`UPDATE stat_form SET raw_frequency_cost = round(sqrt(id), 1);`).run()
+  db.prepare(`UPDATE stat_form SET raw_frequency_cost = sqrt(id);`).run()
 
   db.exec(`CREATE INDEX stat_form_text ON stat_form (text);`)
   db.exec(`CREATE INDEX stat_form_lexeme_id ON stat_form (lexeme_id);`)
@@ -306,15 +306,17 @@ function addIndexes (db) {
 
 function updateCosts (db) {
   console.log('updating costs')
-  db.prepare(`UPDATE stat_lexeme SET cost = raw_frequency_cost;`).run()
+  db.prepare(`UPDATE stat_lexeme SET cost = raw_frequency_cost + 10;`).run()
 
-  db.prepare(`UPDATE stat_form SET cost = raw_frequency_cost;`).run()
+  db.prepare(`UPDATE stat_form SET cost = raw_frequency_cost + 10;`).run()
+  // TODO: mark known words like so:
+  //   console.log(db.prepare(`UPDATE stat_form SET cost = 1 WHERE text = ?;`).run('εὐοδοῦταί'))
   db.prepare(`
-    UPDATE stat_form SET cost = min(cost, round(cost * 0.4 + 0.6 * (
-      SELECT min(cost)
+    UPDATE stat_form SET cost = min(cost, cost * 0.01 + 0.99 * (
+      SELECT min(cheapest.cost)
       FROM stat_form cheapest
       WHERE cheapest.lexeme_id = stat_form.lexeme_id
-      GROUP BY cheapest.lexeme_id), 2));`).run()
+      GROUP BY cheapest.lexeme_id));`).run()
 
 /*
 select id, text, raw_frequency_cost, cost, min(cost, (
@@ -325,13 +327,19 @@ select id, text, raw_frequency_cost, cost, min(cost, (
 from stat_form x
 order by cost
 limit 30
+
+select *
+from stat_form
+WHERE lexeme_id = 1911
+ORDER by cost
+LIMIT 50
 */
 
 
   db.prepare(`
     UPDATE text_sentence
     SET average_form_cost = (
-      SELECT round(avg(rfc.cost), 1) FROM (
+      SELECT avg(rfc.cost) FROM (
         SELECT text_lone, cost
         FROM (
           SELECT text_lone
@@ -368,7 +376,7 @@ limit 30
   db.prepare(`
     UPDATE text_clause
     SET average_form_cost = (
-      SELECT round(avg(rfc.cost), 1) FROM (
+      SELECT avg(rfc.cost) FROM (
         SELECT text_lone, cost
         FROM (
           SELECT text_lone
@@ -443,47 +451,6 @@ limit 30
     GROUP BY sentence_id`).all())
 
 
-  console.log('by length')
-  console.log(db.prepare('select id, length from text_clause ORDER BY length ASC LIMIT 5;').all())
-  console.log(db.prepare('select id, length from text_clause ORDER BY length DESC LIMIT 5;').all())
-
-  console.log('by average raw form frequency cost')
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE clause_id IN (
-      SELECT id
-      FROM text_clause
-      WHERE length > 2
-      ORDER BY average_form_cost
-      LIMIT 8)
-    GROUP BY clause_id`).all())
-
-  console.log('by total raw form frequency cost')
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE clause_id IN (
-      SELECT id
-      FROM text_clause
-      WHERE length > 2
-      ORDER BY total_unique_form_cost
-      LIMIT 8)
-    GROUP BY clause_id`).all())
-
-  console.log('by geometric raw form frequency cost')
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE clause_id IN (
-      SELECT id
-      FROM text_clause
-      WHERE length > 2
-      ORDER BY geometric_unique_form_cost
-      LIMIT 8)
-    GROUP BY clause_id`).all())
-
-
   console.log('highest frequency clauses')
   console.log(db.prepare(`
     SELECT group_concat(gloss_interlinear, ' ') AS stext
@@ -492,6 +459,42 @@ limit 30
       SELECT example_id
       FROM stat_clause
       ORDER BY frequency DESC
+      LIMIT 10)
+    GROUP BY clause_id`).all())
+
+  console.log('by average raw form frequency cost')
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE clause_id IN (
+      SELECT example_id
+      FROM stat_clause
+      JOIN text_clause ON text_clause.id = stat_clause.example_id
+      ORDER BY average_form_cost
+      LIMIT 10)
+    GROUP BY clause_id`).all())
+
+  console.log('by total raw form frequency cost')
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE clause_id IN (
+      SELECT example_id
+      FROM stat_clause
+      JOIN text_clause ON text_clause.id = stat_clause.example_id
+      ORDER BY total_unique_form_cost
+      LIMIT 10)
+    GROUP BY clause_id`).all())
+
+  console.log('by geometric raw form frequency cost')
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE clause_id IN (
+      SELECT example_id
+      FROM stat_clause
+      JOIN text_clause ON text_clause.id = stat_clause.example_id
+      ORDER BY geometric_unique_form_cost
       LIMIT 10)
     GROUP BY clause_id`).all())
 }
