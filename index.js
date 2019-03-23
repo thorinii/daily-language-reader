@@ -10,6 +10,10 @@ async function main () {
   const db = new Database('database.sqlite3')
   db.function('sqrt', { deterministic: true }, (a) => Math.sqrt(a))
   db.function('log', { deterministic: true }, (a) => Math.log(a))
+  db.aggregate('mul', {
+    start: 1,
+    step: (total, nextValue) => total * nextValue,
+  });
 
   if (!db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name = 'text_words' ORDER BY name;`).get()) {
     installDb(db)
@@ -128,6 +132,7 @@ function installDb (db) {
       id INTEGER PRIMARY KEY,
 
       text TEXT NOT NULL,
+      text_lone TEXT NOT NULL,
       text_unaccented TEXT NOT NULL,
       text_lemma TEXT NOT NULL,
 
@@ -163,6 +168,16 @@ function installDb (db) {
       raw_frequency_cost DOUBLE NOT NULL
     );
 
+    CREATE TABLE stat_sentence (
+      id INTEGER PRIMARY KEY,
+
+      length INTEGER NOT NULL,
+      unique_length INTEGER NOT NULL,
+      average_form_cost DOUBLE NOT NULL,
+      total_unique_form_cost DOUBLE NOT NULL,
+      geometric_unique_form_cost DOUBLE NOT NULL
+    );
+
     CREATE TABLE text_clauses (
       id INTEGER PRIMARY KEY,
 
@@ -178,6 +193,7 @@ function installDb (db) {
 function addIndexes (db) {
   console.log('creating column indexes')
   db.exec(`CREATE INDEX text_words_text ON text_words (text);`)
+  db.exec(`CREATE INDEX text_words_text_lone ON text_words (text_lone);`)
   db.exec(`CREATE INDEX text_words_text_unaccented ON text_words (text_unaccented);`)
   db.exec(`CREATE INDEX text_words_text_lemma ON text_words (text_lemma);`)
 
@@ -200,29 +216,144 @@ function addIndexes (db) {
 
   db.prepare(`
     INSERT INTO stat_form (text, lexeme_id, gloss_word, frequency, raw_frequency_cost)
-      SELECT text_unaccented, (SELECT id FROM stat_lexeme WHERE text = text_lemma), gloss_word, COUNT(*) AS frequency, 0
+      SELECT text_lone, (SELECT id FROM stat_lexeme WHERE text = text_lemma), gloss_word, COUNT(*) AS frequency, 0
       FROM text_words
-      GROUP BY text_unaccented
+      GROUP BY text_lone
       ORDER BY frequency DESC;`).run()
   db.prepare(`UPDATE stat_form SET raw_frequency_cost = round(log(id) + 1, 1);`).run()
+
+  db.prepare(`
+    INSERT INTO stat_sentence (id, length, unique_length, average_form_cost, total_unique_form_cost, geometric_unique_form_cost)
+      SELECT sentence_id, COUNT(*), 0, 0, 0, 0
+      FROM text_words
+      GROUP BY sentence_id;`).run()
+  db.prepare(`
+    UPDATE stat_sentence
+    SET unique_length = (
+      SELECT COUNT(*)
+      FROM (
+        SELECT text_lone
+        FROM text_words
+        WHERE sentence_id = stat_sentence.id
+        GROUP BY text_lone));`).run()
 }
 
 function updateCosts (db) {
-  console.log(db.prepare('select id, text, frequency, raw_frequency_cost from stat_lexeme ORDER BY id ASC LIMIT 20;').all())
+  console.log('updating costs')
+  db.prepare(`
+    UPDATE stat_sentence
+    SET average_form_cost = (
+      SELECT round(avg(rfc.cost), 1) FROM (
+        SELECT text_lone, raw_frequency_cost AS cost
+        FROM (
+          SELECT text_lone
+          FROM text_words
+          WHERE sentence_id = stat_sentence.id
+          GROUP BY text_lone) AS unique_words
+        JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
 
-  console.log(db.prepare('select id, text, frequency, raw_frequency_cost from stat_form ORDER BY id ASC LIMIT 20;').all())
+  db.prepare(`
+    UPDATE stat_sentence
+    SET total_unique_form_cost = (
+      SELECT sum(rfc.cost) FROM (
+        SELECT text_lone, raw_frequency_cost AS cost
+        FROM (
+          SELECT text_lone
+          FROM text_words
+          WHERE sentence_id = stat_sentence.id
+          GROUP BY text_lone) AS unique_words
+        JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
 
-  console.log(db.prepare('select COUNT(*) count, MIN(frequency) freq_low, MAX(frequency) freq_high, round(raw_frequency_cost * 5) / 5 cost from stat_lexeme GROUP BY cost ORDER BY cost ASC;').all())
-  console.log(db.prepare('select COUNT(*) count, MIN(frequency) freq_low, MAX(frequency) freq_high, round(raw_frequency_cost * 5) / 5 cost from stat_form GROUP BY cost ORDER BY cost ASC;').all())
+  db.prepare(`
+    UPDATE stat_sentence
+    SET geometric_unique_form_cost = (
+      SELECT mul(rfc.cost) FROM (
+        SELECT text_lone, raw_frequency_cost AS cost
+        FROM (
+          SELECT text_lone
+          FROM text_words
+          WHERE sentence_id = stat_sentence.id
+          GROUP BY text_lone) AS unique_words
+        JOIN stat_form ON stat_form.text = unique_words.text_lone) AS rfc);`).run()
+
+  console.log('by length')
+  console.log(db.prepare('select id, length from stat_sentence ORDER BY length ASC LIMIT 5;').all())
+  console.log(db.prepare('select id, length from stat_sentence ORDER BY length DESC LIMIT 5;').all())
+
+  console.log('by average raw form frequency cost')
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE sentence_id IN (
+      SELECT id
+      FROM stat_sentence
+      WHERE length > 2
+      ORDER BY average_form_cost
+      LIMIT 3)
+    GROUP BY sentence_id`).all())
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE sentence_id IN (
+      SELECT id
+      FROM stat_sentence
+      WHERE length > 2
+      ORDER BY average_form_cost DESC
+      LIMIT 3)
+    GROUP BY sentence_id`).all())
+
+  console.log('by total raw form frequency cost')
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE sentence_id IN (
+      SELECT id
+      FROM stat_sentence
+      WHERE length > 2
+      ORDER BY total_unique_form_cost
+      LIMIT 3)
+    GROUP BY sentence_id`).all())
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE sentence_id IN (
+      SELECT id
+      FROM stat_sentence
+      WHERE length < 20
+      ORDER BY total_unique_form_cost DESC
+      LIMIT 3)
+    GROUP BY sentence_id`).all())
+
+  console.log('by geometric raw form frequency cost')
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE sentence_id IN (
+      SELECT id
+      FROM stat_sentence
+      WHERE length > 2
+      ORDER BY geometric_unique_form_cost
+      LIMIT 3)
+    GROUP BY sentence_id`).all())
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE sentence_id IN (
+      SELECT id
+      FROM stat_sentence
+      WHERE length < 20
+      ORDER BY geometric_unique_form_cost DESC
+      LIMIT 3)
+    GROUP BY sentence_id`).all())
 }
 
 function extractTextIntoDb (db) {
   const insertStatement = db.prepare(`INSERT INTO text_words (
     id,
-    text, text_unaccented, text_lemma,
+    text, text_lone, text_unaccented, text_lemma,
     gloss_word, gloss_interlinear,
     book_id, chapter_number, verse_number, paragraph_id, sentence_id, clause_id
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 
   let previousBookId = null
 
@@ -234,6 +365,13 @@ function extractTextIntoDb (db) {
   let wordCounter = 0
 
   return new Promise((resolve, reject) => {
+    // validating SQL:
+    //   select a.id, b.id, b.paragraph_id - a.paragraph_id, b.sentence_id - a.sentence_id
+    //   from text_words a
+    //   join text_words b
+    //   where a.id = b.id - 1
+    //     and a.book_id = b.book_id - 1
+
     db.exec('BEGIN;')
     fs.createReadStream(path.join(__dirname, 'rawtexts/OpenGNT_version3_3.csv'))
       .pipe(csv({ separator: '\t' }))
@@ -258,6 +396,7 @@ function extractTextIntoDb (db) {
         const wordId = parseInt(data['OGNTsort'])
 
         const text = leftPunctuation + data['OGNTa'] + rightPunctuation.filter(p => p !== '¶')
+        const textLone = data['OGNTa']
         const textUnaccented = data['OGNTu']
         const textLemma = data['lexeme']
 
@@ -275,9 +414,11 @@ function extractTextIntoDb (db) {
         }
         if (newParagraph) {
           paragraphCounter++
+          newParagraph = false
         }
         if (newSentence) {
           sentenceCounter++
+          newSentence = false
         }
 
         const paragraphId = paragraphCounter
@@ -293,7 +434,7 @@ function extractTextIntoDb (db) {
 
         insertStatement.run(
           wordId,
-          text, textUnaccented, textLemma,
+          text, textLone, textUnaccented, textLemma,
           glossWord, glossInterlinear,
           bookId, chapterNumber, verseNumber, paragraphId, sentenceId, clauseId)
 
