@@ -189,11 +189,20 @@ function installDb (db) {
       total_unique_form_cost DOUBLE NOT NULL,
       geometric_unique_form_cost DOUBLE NOT NULL
     );
+
+    CREATE TABLE stat_clause (
+      id INTEGER PRIMARY KEY,
+      example_id INTEGER NOT NULL,
+
+      text TEXT NOT NULL,
+
+      frequency INTEGER NOT NULL
+    );
   `)
 }
 
 function addIndexes (db) {
-  console.log('creating column indexes')
+  console.log('indexing text')
   db.exec(`CREATE INDEX text_words_text ON text_words (text);`)
   db.exec(`CREATE INDEX text_words_text_lone ON text_words (text_lone);`)
   db.exec(`CREATE INDEX text_words_text_unaccented ON text_words (text_unaccented);`)
@@ -207,7 +216,7 @@ function addIndexes (db) {
   db.exec(`CREATE INDEX text_words_clause_id ON text_words (clause_id);`)
 
 
-  console.log('creating statistical indexes')
+  console.log('indexing lexemes')
   db.prepare(`
     INSERT INTO stat_lexeme (text, frequency, raw_frequency_cost, cost)
       SELECT text_lemma, COUNT(*) AS frequency, 0, 0
@@ -216,6 +225,11 @@ function addIndexes (db) {
       ORDER BY frequency DESC;`).run()
   db.prepare(`UPDATE stat_lexeme SET raw_frequency_cost = round(sqrt(id), 1);`).run()
 
+  db.exec(`CREATE INDEX stat_lexeme_text ON stat_lexeme (text);`)
+  db.exec(`CREATE INDEX stat_lexeme_cost ON stat_lexeme (cost);`)
+
+
+  console.log('indexing forms')
   db.prepare(`
     INSERT INTO stat_form (text, lexeme_id, gloss_word, frequency, raw_frequency_cost, cost)
       SELECT text_lone, (SELECT id FROM stat_lexeme WHERE text = text_lemma), gloss_word, COUNT(*) AS frequency, 0, 0
@@ -224,14 +238,12 @@ function addIndexes (db) {
       ORDER BY frequency DESC;`).run()
   db.prepare(`UPDATE stat_form SET raw_frequency_cost = round(sqrt(id), 1);`).run()
 
-  db.exec(`CREATE INDEX stat_lexeme_text ON stat_lexeme (text);`)
-  db.exec(`CREATE INDEX stat_lexeme_cost ON stat_lexeme (cost);`)
-
   db.exec(`CREATE INDEX stat_form_text ON stat_form (text);`)
   db.exec(`CREATE INDEX stat_form_lexeme_id ON stat_form (lexeme_id);`)
   db.exec(`CREATE INDEX stat_form_cost ON stat_form (cost);`)
 
 
+  console.log('indexing all sentences')
   db.prepare(`
     INSERT INTO text_sentence (id, length, unique_length, average_form_cost, total_unique_form_cost, geometric_unique_form_cost)
       SELECT sentence_id, COUNT(*), 0, 0, 0, 0
@@ -254,6 +266,7 @@ function addIndexes (db) {
   db.exec(`CREATE INDEX text_sentence_geometric_unique_form_cost ON text_sentence (geometric_unique_form_cost);`)
 
 
+  console.log('indexing all clauses')
   db.prepare(`
     INSERT INTO text_clause (id, length, unique_length, average_form_cost, total_unique_form_cost, geometric_unique_form_cost)
       SELECT clause_id, COUNT(*), 0, 0, 0, 0
@@ -274,6 +287,21 @@ function addIndexes (db) {
   db.exec(`CREATE INDEX text_clause_average_form_cost ON text_clause (average_form_cost);`)
   db.exec(`CREATE INDEX text_clause_total_unique_form_cost ON text_clause (total_unique_form_cost);`)
   db.exec(`CREATE INDEX text_clause_geometric_unique_form_cost ON text_clause (geometric_unique_form_cost);`)
+
+
+  console.log('indexing clause forms')
+  db.prepare(`
+    INSERT INTO stat_clause (example_id, text, frequency)
+      SELECT MIN(clause_id), text, COUNT(*) AS count
+      FROM (
+        SELECT clause_id, group_concat(text_lone, ' ') text
+        FROM text_words
+        GROUP BY clause_id)
+      GROUP BY text
+      ORDER BY count DESC;`).run()
+
+  db.exec(`CREATE INDEX text_clause_example_id ON stat_clause (example_id);`)
+  db.exec(`CREATE INDEX text_clause_frequency ON stat_clause (frequency);`)
 }
 
 function updateCosts (db) {
@@ -453,6 +481,18 @@ limit 30
       WHERE length > 2
       ORDER BY geometric_unique_form_cost
       LIMIT 8)
+    GROUP BY clause_id`).all())
+
+
+  console.log('highest frequency clauses')
+  console.log(db.prepare(`
+    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    FROM text_words
+    WHERE clause_id IN (
+      SELECT example_id
+      FROM stat_clause
+      ORDER BY frequency DESC
+      LIMIT 10)
     GROUP BY clause_id`).all())
 }
 
