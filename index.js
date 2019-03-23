@@ -387,17 +387,7 @@ limit 30
       FROM text_sentence
       WHERE length > 2
       ORDER BY average_form_cost
-      LIMIT 3)
-    GROUP BY sentence_id`).all())
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE sentence_id IN (
-      SELECT id
-      FROM text_sentence
-      WHERE length > 2
-      ORDER BY average_form_cost DESC
-      LIMIT 3)
+      LIMIT 5)
     GROUP BY sentence_id`).all())
 
   console.log('by total raw form frequency cost')
@@ -409,17 +399,7 @@ limit 30
       FROM text_sentence
       WHERE length > 2
       ORDER BY total_unique_form_cost
-      LIMIT 3)
-    GROUP BY sentence_id`).all())
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE sentence_id IN (
-      SELECT id
-      FROM text_sentence
-      WHERE length < 20
-      ORDER BY total_unique_form_cost DESC
-      LIMIT 3)
+      LIMIT 5)
     GROUP BY sentence_id`).all())
 
   console.log('by geometric raw form frequency cost')
@@ -431,17 +411,7 @@ limit 30
       FROM text_sentence
       WHERE length > 2
       ORDER BY geometric_unique_form_cost
-      LIMIT 3)
-    GROUP BY sentence_id`).all())
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE sentence_id IN (
-      SELECT id
-      FROM text_sentence
-      WHERE length < 20
-      ORDER BY geometric_unique_form_cost DESC
-      LIMIT 3)
+      LIMIT 5)
     GROUP BY sentence_id`).all())
 
 
@@ -458,17 +428,7 @@ limit 30
       FROM text_clause
       WHERE length > 2
       ORDER BY average_form_cost
-      LIMIT 3)
-    GROUP BY clause_id`).all())
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE clause_id IN (
-      SELECT id
-      FROM text_clause
-      WHERE length > 2
-      ORDER BY average_form_cost DESC
-      LIMIT 3)
+      LIMIT 8)
     GROUP BY clause_id`).all())
 
   console.log('by total raw form frequency cost')
@@ -480,17 +440,7 @@ limit 30
       FROM text_clause
       WHERE length > 2
       ORDER BY total_unique_form_cost
-      LIMIT 3)
-    GROUP BY clause_id`).all())
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE clause_id IN (
-      SELECT id
-      FROM text_clause
-      WHERE length < 20
-      ORDER BY total_unique_form_cost DESC
-      LIMIT 3)
+      LIMIT 8)
     GROUP BY clause_id`).all())
 
   console.log('by geometric raw form frequency cost')
@@ -502,17 +452,7 @@ limit 30
       FROM text_clause
       WHERE length > 2
       ORDER BY geometric_unique_form_cost
-      LIMIT 3)
-    GROUP BY clause_id`).all())
-  console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
-    FROM text_words
-    WHERE clause_id IN (
-      SELECT id
-      FROM text_clause
-      WHERE length < 20
-      ORDER BY geometric_unique_form_cost DESC
-      LIMIT 3)
+      LIMIT 8)
     GROUP BY clause_id`).all())
 }
 
