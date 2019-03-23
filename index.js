@@ -214,7 +214,7 @@ function addIndexes (db) {
       FROM text_words
       GROUP BY text_lemma
       ORDER BY frequency DESC;`).run()
-  db.prepare(`UPDATE stat_lexeme SET raw_frequency_cost = round(log(id) + 1, 1);`).run()
+  db.prepare(`UPDATE stat_lexeme SET raw_frequency_cost = round(sqrt(id), 1);`).run()
 
   db.prepare(`
     INSERT INTO stat_form (text, lexeme_id, gloss_word, frequency, raw_frequency_cost, cost)
@@ -222,7 +222,15 @@ function addIndexes (db) {
       FROM text_words
       GROUP BY text_lone
       ORDER BY frequency DESC;`).run()
-  db.prepare(`UPDATE stat_form SET raw_frequency_cost = round(log(id) + 1, 1);`).run()
+  db.prepare(`UPDATE stat_form SET raw_frequency_cost = round(sqrt(id), 1);`).run()
+
+  db.exec(`CREATE INDEX stat_lexeme_text ON stat_lexeme (text);`)
+  db.exec(`CREATE INDEX stat_lexeme_cost ON stat_lexeme (cost);`)
+
+  db.exec(`CREATE INDEX stat_form_text ON stat_form (text);`)
+  db.exec(`CREATE INDEX stat_form_lexeme_id ON stat_form (lexeme_id);`)
+  db.exec(`CREATE INDEX stat_form_cost ON stat_form (cost);`)
+
 
   db.prepare(`
     INSERT INTO text_sentence (id, length, unique_length, average_form_cost, total_unique_form_cost, geometric_unique_form_cost)
@@ -239,6 +247,13 @@ function addIndexes (db) {
         WHERE sentence_id = text_sentence.id
         GROUP BY text_lone));`).run()
 
+  db.exec(`CREATE INDEX text_sentence_length ON text_sentence (length);`)
+  db.exec(`CREATE INDEX text_sentence_unique_length ON text_sentence (unique_length);`)
+  db.exec(`CREATE INDEX text_sentence_average_form_cost ON text_sentence (average_form_cost);`)
+  db.exec(`CREATE INDEX text_sentence_total_unique_form_cost ON text_sentence (total_unique_form_cost);`)
+  db.exec(`CREATE INDEX text_sentence_geometric_unique_form_cost ON text_sentence (geometric_unique_form_cost);`)
+
+
   db.prepare(`
     INSERT INTO text_clause (id, length, unique_length, average_form_cost, total_unique_form_cost, geometric_unique_form_cost)
       SELECT clause_id, COUNT(*), 0, 0, 0, 0
@@ -253,12 +268,37 @@ function addIndexes (db) {
         FROM text_words
         WHERE clause_id = text_clause.id
         GROUP BY text_lone));`).run()
+
+  db.exec(`CREATE INDEX text_clause_length ON text_clause (length);`)
+  db.exec(`CREATE INDEX text_clause_unique_length ON text_clause (unique_length);`)
+  db.exec(`CREATE INDEX text_clause_average_form_cost ON text_clause (average_form_cost);`)
+  db.exec(`CREATE INDEX text_clause_total_unique_form_cost ON text_clause (total_unique_form_cost);`)
+  db.exec(`CREATE INDEX text_clause_geometric_unique_form_cost ON text_clause (geometric_unique_form_cost);`)
 }
 
 function updateCosts (db) {
   console.log('updating costs')
   db.prepare(`UPDATE stat_lexeme SET cost = raw_frequency_cost;`).run()
+
   db.prepare(`UPDATE stat_form SET cost = raw_frequency_cost;`).run()
+  db.prepare(`
+    UPDATE stat_form SET cost = min(cost, round(cost * 0.4 + 0.6 * (
+      SELECT min(cost)
+      FROM stat_form cheapest
+      WHERE cheapest.lexeme_id = stat_form.lexeme_id
+      GROUP BY cheapest.lexeme_id), 2));`).run()
+
+/*
+select id, text, raw_frequency_cost, cost, min(cost, (
+	select min(cost) + 1
+	from stat_form b
+	where b.lexeme_id = x.lexeme_id
+	group by lexeme_id)) mincost
+from stat_form x
+order by cost
+limit 30
+*/
+
 
   db.prepare(`
     UPDATE text_sentence
@@ -525,7 +565,7 @@ function extractTextIntoDb (db) {
         const wordId = parseInt(data['OGNTsort'])
 
         const text = leftPunctuation + data['OGNTa'] + rightPunctuation.filter(p => p !== '¶')
-        const textLone = data['OGNTa']
+        const textLone = data['OGNTa'].toLowerCase()
         const textUnaccented = data['OGNTu']
         const textLemma = data['lexeme']
 
