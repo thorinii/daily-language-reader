@@ -212,8 +212,8 @@ function updateCosts (db) {
 
   console.log(db.prepare('select id, text, frequency, raw_frequency_cost from stat_form ORDER BY id ASC LIMIT 20;').all())
 
-  console.log(db.prepare('select COUNT(*) count, MIN(frequency) freq_low, MAX(frequency) freq_high, round(raw_frequency_cost) cost from stat_lexeme GROUP BY cost ORDER BY cost ASC;').all())
-  console.log(db.prepare('select COUNT(*) count, MIN(frequency) freq_low, MAX(frequency) freq_high, round(raw_frequency_cost) cost from stat_form GROUP BY cost ORDER BY cost ASC;').all())
+  console.log(db.prepare('select COUNT(*) count, MIN(frequency) freq_low, MAX(frequency) freq_high, round(raw_frequency_cost * 5) / 5 cost from stat_lexeme GROUP BY cost ORDER BY cost ASC;').all())
+  console.log(db.prepare('select COUNT(*) count, MIN(frequency) freq_low, MAX(frequency) freq_high, round(raw_frequency_cost * 5) / 5 cost from stat_form GROUP BY cost ORDER BY cost ASC;').all())
 }
 
 function extractTextIntoDb (db) {
@@ -224,8 +224,14 @@ function extractTextIntoDb (db) {
     book_id, chapter_number, verse_number, paragraph_id, sentence_id, clause_id
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 
+  let previousBookId = null
+
+  let newParagraph = false
+  let newSentence = false
   let paragraphCounter = 1
   let sentenceCounter = 1
+
+  let wordCounter = 0
 
   return new Promise((resolve, reject) => {
     db.exec('BEGIN;')
@@ -259,26 +265,42 @@ function extractTextIntoDb (db) {
         const chapterNumber = parseInt(data['Chapter'])
         const verseNumber = parseInt(data['Verse'])
 
+        const glossWord = data['TBESG']
+        const glossInterlinear = data['LT']
+
+        if (previousBookId !== bookId) {
+          previousBookId = bookId
+          newParagraph = true
+          newSentence = true
+        }
+        if (newParagraph) {
+          paragraphCounter++
+        }
+        if (newSentence) {
+          sentenceCounter++
+        }
+
         const paragraphId = paragraphCounter
         const sentenceId = sentenceCounter
         const clauseId = parseInt(data['LevinsohnClauseID'].substring(1))
 
-        const glossWord = data['TBESG']
-        const glossInterlinear = data['LT']
-
         if (rightPunctuation.includes('¶')) {
-          paragraphCounter++
+          newParagraph = true
         }
         if (rightPunctuation.includes('.')) {
-          sentenceCounter++
+          newSentence = true
         }
 
-        console.log({ bookId, paragraphId,  wordId, text })
         insertStatement.run(
           wordId,
           text, textUnaccented, textLemma,
           glossWord, glossInterlinear,
           bookId, chapterNumber, verseNumber, paragraphId, sentenceId, clauseId)
+
+        wordCounter++
+        if (wordCounter % 1000 === 0) {
+          console.log('In book %d, loaded %d words', bookId, wordCounter)
+        }
       })
       .on('error', e => {
         db.exec('ROLLBACK;')
