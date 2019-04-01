@@ -2,7 +2,7 @@
 
 ## Raw next tasks
 
-* Clause "deduplication"; find exact common clauses
+* Verse-verse cost graph
 * Rendering a cost-sorted list of texts, by various cost algorithms
     * With sentence, verse(s), or paragraph context
 * Show passages by reference (with context)
