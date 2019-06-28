@@ -17,6 +17,10 @@ function readStdinWords () {
 }
 
 const clauses = require('./rawtexts/OpenGNT_TranslationByClause.json')
+  .map((clause, idx) => {
+    clause.id = idx
+    return clause
+  })
 
 module.exports = {
   clauses,
