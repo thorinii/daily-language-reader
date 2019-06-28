@@ -34,4 +34,4 @@ clauseIds
       interlinear: clauses.map(c => c.plain)
     }
   })
-  .forEach(line => console.log(line))
+  .forEach(line => console.log(JSON.stringify(line)))

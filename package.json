@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/thorinii/daily-language-reader/issues"
   },
-  "homepage": "https://github.com/thorinii/daily-language-reader#readme"
+  "homepage": "https://github.com/thorinii/daily-language-reader#readme",
+  "dependencies": {
+    "wordwrap": "^1.0.0"
+  }
 }
