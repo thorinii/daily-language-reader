@@ -30,6 +30,7 @@ clauseIds
     .filter(c => c.id >= id - contextRadius && c.id <= id + contextRadius))
   .map(clauses => {
     return {
+      ids: clauses.map(c => c.id),
       text: clauses.map(c => c.text),
       interlinear: clauses.map(c => c.plain)
     }
