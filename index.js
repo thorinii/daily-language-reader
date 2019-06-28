@@ -388,7 +388,7 @@ LIMIT 50
 
   console.log('by average raw form frequency cost')
   console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    SELECT group_concat(text, ' ') AS stext
     FROM text_words
     WHERE sentence_id IN (
       SELECT id
@@ -400,7 +400,7 @@ LIMIT 50
 
   console.log('by total raw form frequency cost')
   console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    SELECT group_concat(text, ' ') AS stext
     FROM text_words
     WHERE sentence_id IN (
       SELECT id
@@ -413,7 +413,7 @@ LIMIT 50
 
   console.log('highest frequency clauses')
   console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    SELECT group_concat(text, ' ') AS stext
     FROM text_words
     WHERE clause_id IN (
       SELECT example_id
@@ -424,7 +424,7 @@ LIMIT 50
 
   console.log('by average raw form frequency cost')
   console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    SELECT group_concat(text, ' ') AS stext
     FROM text_words
     WHERE clause_id IN (
       SELECT example_id
@@ -436,7 +436,7 @@ LIMIT 50
 
   console.log('by total raw form frequency cost')
   console.log(db.prepare(`
-    SELECT group_concat(gloss_interlinear, ' ') AS stext
+    SELECT group_concat(text, ' ') AS stext
     FROM text_words
     WHERE clause_id IN (
       SELECT example_id
