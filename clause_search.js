@@ -1,10 +1,6 @@
-const fs = require('fs')
+const { normalise, clauses, readStdinWords } = require('./utils')
 
-const normalise = s => s.toLowerCase().normalize('NFKD').replace(/[\u0313\u0314\u0345,.’-]/g, '').normalize('NFC')
-
-const clauses = require('./rawtexts/OpenGNT_TranslationByClause.json')
-
-const words = fs.readFileSync('/dev/stdin', 'utf8').split(/\s+/).filter(t => t)
+const words = readStdinWords()
 
 // TODO: return clause IDs as well
 console.log(words

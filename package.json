@@ -1,0 +1,19 @@
+{
+  "name": "gnt-reader",
+  "version": "1.0.0",
+  "description": "",
+  "main": "clause_search.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thorinii/daily-language-reader.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/thorinii/daily-language-reader/issues"
+  },
+  "homepage": "https://github.com/thorinii/daily-language-reader#readme"
+}
