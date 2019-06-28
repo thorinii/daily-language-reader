@@ -22,4 +22,4 @@ words
     .slice(0, clausesPerWord)
     .map(c => [c.id, w, c.text, c.plain]))
   .filter(wc => wc.length > 0)
-  .forEach(wc => wc.forEach(clause => console.log(clause)))
+  .forEach(wc => wc.forEach(clause => console.log(JSON.stringify(clause))))
