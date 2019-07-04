@@ -14,12 +14,17 @@ if (process.argv.length !== 3) {
 }
 
 const styles = `
+* {
+  max-width: 60ch;
+}
 html {
   font-family: sans-serif;
   font-size: 14pt;
+  max-width: initial;
+  width: 100%;
 }
-* {
-  max-width: 60ch;
+body {
+  margin: 2em auto;
 }
 `
 

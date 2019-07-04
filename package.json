@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/thorinii/daily-language-reader#readme",
   "dependencies": {
+    "shuffle-array": "^1.0.1",
     "wordwrap": "^1.0.0"
   }
 }
