@@ -1,21 +1,20 @@
 /**
  * Windowed clause search -- takes a list of words on stdin and returns the
  * least costly OpenGNT clause sequences relative to them.
- *
- * Usage: node windowed_clause_search.js <window size> <min cost> <count>
  */
 
 const shuffle = require('shuffle-array')
 const { clauses, readStdinWords } = require('./utils')
 
-if (process.argv.length !== 5) {
-  console.warn('Usage: node windowed_clause_search.js <window size> <min cost> <count>')
+if (process.argv.length !== 6) {
+  console.warn('Usage: node windowed_clause_search.js <window size> <min cost> <count> <format>')
   return
 }
 
 const windowSize = parseInt(process.argv[2])
 const minCost = parseInt(process.argv[3])
 const count = parseInt(process.argv[4])
+const inHtml = process.argv[5] === 'html'
 const words = new Set(readStdinWords())
 
 
@@ -40,13 +39,54 @@ for (const clause of clauses) {
 }
 
 
-console.log(sequences.length, 'sequences')
+if (inHtml) {
+  console.log('<html>')
+  console.log('<body>')
+  console.log('<h1>GLiB lesson</h1>')
+  console.log('<p>' + sequences.length + ' sequences found total; showing at most ' + count + '</p>')
+} else {
+  console.log(sequences.length, 'sequences')
+}
+
+
 shuffle(sequences)
 sequences
   .sort((a, b) => a.cost < b.cost ? -1 : 1)
   .slice(0, count)
   .forEach(sequence => {
-    console.log(`== ${sequence.cost} ========`)
-    console.log(sequence.clauses.map(c => c.text).join(' | '))
-    console.log(sequence.clauses.map(c => c.plain).join(' '))
+    const wordCount = sequence.clauses.map(c => c.search.length).reduce((acc, b) => acc + b, 0)
+    const text = sequence.clauses.map(c => c.text).join(' | ')
+    const plain = sequence.clauses.map(c => c.plain).join(' ')
+
+    // TODO: passage location in verse coordinates
+
+    if (inHtml) {
+      console.log(`<h2>Unknown location: cost ${sequence.cost} / ${wordCount}</h2>`)
+      console.log('<p>' + text + '</p>')
+      console.log('<p>' + plain + '</p>')
+    } else {
+      console.log(`=========== cost ${sequence.cost} / ${wordCount}`)
+      console.log('  ' + text)
+      console.log()
+      console.log('  ' + plain)
+      console.log()
+    }
   })
+
+
+if (inHtml) {
+  console.log(`<style>
+html {
+  font-size: 16pt;
+  max-width: initial;
+}
+body {
+  margin: auto;
+}
+* {
+  max-width: 70ch;
+}
+</style>`)
+  console.log('</body>')
+  console.log('</html>')
+}
