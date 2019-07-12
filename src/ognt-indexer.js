@@ -16,27 +16,27 @@ const tokenStream = chain([
 const indexBookStream = chain([
   makeRangeIndexer('book_id'),
   csvWriteStream(),
-  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_books.csv')),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_book.csv')),
 ])
 const indexChapterStream = chain([
   makeRangeIndexer('chapter_id'),
   csvWriteStream(),
-  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_chapters.csv')),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_chapter.csv')),
 ])
 const indexVerseStream = chain([
   makeRangeIndexer('verse_id'),
   csvWriteStream(),
-  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_verses.csv')),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_verse.csv')),
 ])
 const indexParagraphStream = chain([
   makeRangeIndexer('paragraph_id'),
   csvWriteStream(),
-  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_paragraphs.csv')),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_paragraph.csv')),
 ])
 const indexSentenceStream = chain([
   makeRangeIndexer('sentence_id'),
   csvWriteStream(),
-  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_sentences.csv')),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_sentence.csv')),
 ])
 
 
