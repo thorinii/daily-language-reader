@@ -71,9 +71,10 @@ chain([
     let book = null
     let chapter = null
     let verse = null
-    let paragraphCounter = 1
-    let sentenceCounter = 1
-    let flushTextCounters = false
+    let paragraphCounter = 0
+    let sentenceCounter = 0
+    let newParagraph = true
+    let newSentence = true
 
     return row => {
       tokenStream.write({
@@ -92,7 +93,8 @@ chain([
       if (book !== row.book) {
         book = row.book
         chapter = -1
-        flushTextCounters = true
+        newParagraph = true
+        newSentence = true
 
         indexBookStream.write({
           type: 'start',
@@ -122,26 +124,35 @@ chain([
         })
       }
 
-      if (row.punctuation_after.includes('¶') || flushTextCounters) {
+      if (newParagraph) {
+        newParagraph = false
+        paragraphCounter++
         indexParagraphStream.write({
           type: 'start',
           id: paragraphCounter,
           pointer: row.token_id,
         })
-        paragraphCounter++
       }
 
-      if (row.punctuation_after.includes('.') || flushTextCounters) {
+      if (newSentence) {
+        newSentence = false
+        sentenceCounter++
         indexSentenceStream.write({
           type: 'start',
           id: sentenceCounter,
           pointer: row.token_id,
         })
-        sentenceCounter++
       }
 
 
-      flushTextCounters = false
+      if (row.punctuation_after.includes('¶')) {
+        newParagraph = true
+        newSentence = true
+      }
+
+      if (row.punctuation_after.includes('.')) {
+        newSentence = true
+      }
 
 
       if (counter % 1000 === 0) console.log('processed', counter, 'words')
@@ -176,25 +187,20 @@ function makeRangeIndexer (key) {
   return event => {
     if (event.pointer) last = event.pointer
 
-    const s = start
-
+    let result = null
     if (start !== null && start !== last) {
-      if (event.type === 'start') {
-        start = last
-        id = event.id
-      } else {
-        start = null
-      }
-
-      return {
+      result = {
         [key]: id,
-        start: s,
+        start,
         end: last - 1,
       }
-    } else if (event.type === 'start') {
+    }
+
+    if (event.type === 'start') {
       start = last
       id = event.id
-      return null
     }
+
+    return result
   }
 }
