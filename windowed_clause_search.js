@@ -14,6 +14,7 @@ if (process.argv.length !== 6) {
 const windowSize = parseInt(process.argv[2])
 const minCost = parseInt(process.argv[3])
 const count = parseInt(process.argv[4])
+const minKnownFraction = 0.6
 const inHtml = process.argv[5] === 'html'
 const words = new Set(readStdinWords())
 
@@ -29,9 +30,11 @@ for (const clause of clauses) {
 
   const allWords = [...new Set([].concat(...previous.map(c => c.search)))]
   const cost = allWords.filter(w => !words.has(w)).length
+  const knownFraction = (allWords.length - cost) / allWords.length
 
-  if (cost >= minCost) {
+  if (cost >= minCost && knownFraction > minKnownFraction) {
     sequences.push({
+      wordCount: allWords.length,
       cost,
       clauses: previous.slice()
     })
@@ -42,7 +45,7 @@ for (const clause of clauses) {
 if (inHtml) {
   console.log('<html>')
   console.log('<body>')
-  console.log('<h1>GLiB lesson</h1>')
+  console.log('<h1>GLiB lesson' + new Date().toISOString() + '</h1>')
   console.log('<p>' + sequences.length + ' sequences found total; showing at most ' + count + '</p>')
 } else {
   console.log(sequences.length, 'sequences')
@@ -54,18 +57,17 @@ sequences
   .sort((a, b) => a.cost < b.cost ? -1 : 1)
   .slice(0, count)
   .forEach(sequence => {
-    const wordCount = sequence.clauses.map(c => c.search.length).reduce((acc, b) => acc + b, 0)
     const text = sequence.clauses.map(c => c.text).join(' | ')
     const plain = sequence.clauses.map(c => c.plain).join(' ')
 
     // TODO: passage location in verse coordinates
 
     if (inHtml) {
-      console.log(`<h2>Unknown location: cost ${sequence.cost} / ${wordCount}</h2>`)
+      console.log(`<h2>Unknown location: cost ${sequence.cost} / ${sequence.wordCount}</h2>`)
       console.log('<p>' + text + '</p>')
       console.log('<p>' + plain + '</p>')
     } else {
-      console.log(`=========== cost ${sequence.cost} / ${wordCount}`)
+      console.log(`=========== cost ${sequence.cost} / ${sequence.wordCount}`)
       console.log('  ' + text)
       console.log()
       console.log('  ' + plain)

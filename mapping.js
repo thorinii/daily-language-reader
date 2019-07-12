@@ -79,3 +79,8 @@ const normalise = s => s.toLowerCase().normalize('NFKD').replace(/[\u0313\u0314\
 
 // a clause finding algorithm given a text
 text.replace(/[’.,·]/g, '').split(' ').map(t => normalise(t)).filter(t => t).map(w => [w, clauses.filter(c => c.search.includes(w)).sort(() => Math.random() < 0.5 ? 1 : -1).sort((a, b) => a.search.length < b.search.length ? -1 : 1).slice(0, 5).map(c => c.text + '  |  ' + c.plain)])
+
+const rows = []; fs.createReadStream('rawtexts/OpenGNT_version3_3.csv').pipe(csv({ separator: '\t', mapHeaders: ({ header, index }) => header.trim(), mapValues: ({ header, index, value }) => value.trim() })).on('data', data => rows.push(data)).on('end', () => console.log('got:', rows.length)).on('error', e => console.warn('error:', e))
+function split (r, key) { const v = r[key]; key = key.replace(/[〔〕]/g, '').split('｜'); const value = v.replace(/[〔〕]/g, '').split('｜'); key.forEach((k, i) => r[k] = value[i]); }
+rows.forEach(r => { split(r, '〔BGBsortI｜LTsortI｜STsortI〕'); split(r, '〔Book｜Chapter｜Verse〕'); split(r, '〔OGNTk｜OGNTu｜OGNTa｜lexeme｜rmac｜sn〕'); split(r, '〔BDAGentry｜EDNTentry｜MounceEntry｜GoodrickKohlenbergerNumbers｜LN-LouwNidaNumbers〕'); split(r, '〔transSBLcap｜transSBL｜modernGreek｜Fonética_Transliteración〕'); split(r, '〔TBESG｜IT｜LT｜ST｜Español〕'); split(r, '〔PMpWord｜PMfWord〕'); split(r, '〔Note｜Mvar｜Mlexeme｜Mrmac｜Msn｜MTBESG〕'); })
+rows.forEach(r => { Object.keys(r).forEach(k => r[k] = parseInt(r[k]) || r[k] ) })
