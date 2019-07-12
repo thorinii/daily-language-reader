@@ -1,43 +1,47 @@
-const fs   = require('fs')
+const fs = require('fs')
+const path = require('path')
 const {chain}  = require('stream-chain')
 const {parser} = require('stream-json')
 const {streamArray} = require('stream-json/streamers/StreamArray')
 const csvWriteStream = require('csv-write-stream')
 
+
+const rawtextsPath = path.join(__dirname, '../rawtexts')
+
 const tokenStream = chain([
   csvWriteStream(),
-  fs.createWriteStream('rawtexts/ognt_33_tokens.csv'),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_tokens.csv')),
 ])
 
 const indexBookStream = chain([
   makeRangeIndexer('book_id'),
   csvWriteStream(),
-  fs.createWriteStream('rawtexts/ognt_33_index_books.csv'),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_books.csv')),
 ])
 const indexChapterStream = chain([
   makeRangeIndexer('chapter_id'),
   csvWriteStream(),
-  fs.createWriteStream('rawtexts/ognt_33_index_chapters.csv'),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_chapters.csv')),
 ])
 const indexVerseStream = chain([
   makeRangeIndexer('verse_id'),
   csvWriteStream(),
-  fs.createWriteStream('rawtexts/ognt_33_index_verses.csv'),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_verses.csv')),
 ])
 const indexParagraphStream = chain([
   makeRangeIndexer('paragraph_id'),
   csvWriteStream(),
-  fs.createWriteStream('rawtexts/ognt_33_index_paragraphs.csv'),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_paragraphs.csv')),
 ])
 const indexSentenceStream = chain([
   makeRangeIndexer('sentence_id'),
   csvWriteStream(),
-  fs.createWriteStream('rawtexts/ognt_33_index_sentences.csv'),
+  fs.createWriteStream(path.join(rawtextsPath, 'ognt_33_index_sentences.csv')),
 ])
 
 
 chain([
-  fs.createReadStream('rawtexts/OpenGNT_version3_3.json'),
+  fs.createReadStream(path.join(rawtextsPath, 'OpenGNT_version3_3.json')),
   parser(),
   streamArray(),
   row => {
@@ -69,6 +73,7 @@ chain([
     let verse = null
     let paragraphCounter = 1
     let sentenceCounter = 1
+    let flushTextCounters = false
 
     return row => {
       tokenStream.write({
@@ -87,6 +92,7 @@ chain([
       if (book !== row.book) {
         book = row.book
         chapter = -1
+        flushTextCounters = true
 
         indexBookStream.write({
           type: 'start',
@@ -116,7 +122,7 @@ chain([
         })
       }
 
-      if (row.punctuation_after.includes('¶')) {
+      if (row.punctuation_after.includes('¶') || flushTextCounters) {
         indexParagraphStream.write({
           type: 'start',
           id: paragraphCounter,
@@ -125,7 +131,7 @@ chain([
         paragraphCounter++
       }
 
-      if (row.punctuation_after.includes('.')) {
+      if (row.punctuation_after.includes('.') || flushTextCounters) {
         indexSentenceStream.write({
           type: 'start',
           id: sentenceCounter,
@@ -133,6 +139,9 @@ chain([
         })
         sentenceCounter++
       }
+
+
+      flushTextCounters = false
 
 
       if (counter % 1000 === 0) console.log('processed', counter, 'words')

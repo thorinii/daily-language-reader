@@ -3,3 +3,4 @@
 /database.sqlite3
 /node_modules
 index.html
+*.tar.gz
