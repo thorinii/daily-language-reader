@@ -59,11 +59,12 @@ async function main (args) {
     revealFraction,
   } = renderLesson(known, chunkLength, maxLearning, frequencyMap, p)
 
+  const reference = calculateReference(p)
+
 
   await saveSeenWords(seenWords)
 
 
-  // TODO: display reference
   // TODO: fix parseInt in tokens
 
   const format = args[0] === 'html' ? 'html' : 'text'
@@ -75,6 +76,8 @@ async function main (args) {
     console.log('Learning:', learningWords.join(', '))
     console.log('Learning ratio:', (learningFraction * 100).toFixed(0) + '%')
     console.log('Reveal ratio:', (revealFraction * 100).toFixed(0) + '%')
+    console.log()
+    console.log(reference)
     console.log()
     console.log(formatAsText(rendered))
   } else {
@@ -90,7 +93,7 @@ async function main (args) {
     console.log('Reveal ratio:', (revealFraction * 100).toFixed(0) + '%', '<br>')
     console.log('</p>')
 
-    console.log('<h2 style="max-width: 1000px; margin: 1em auto; line-height: 1.3">Passage</h2>')
+    console.log('<h2 style="max-width: 1000px; margin: 1em auto; line-height: 1.3">' + reference + '</h2>')
     console.log(formatAsHtml(rendered))
 
     console.log('</body>')
@@ -187,6 +190,61 @@ function renderLesson (known, chunkLength, maxLearning, frequencyMap, passage) {
     seenWords: [...seenWords],
     learningFraction: allLearningWords.size / allWords.size,
     revealFraction: seenWords.size / allWords.size,
+  }
+}
+
+
+function calculateReference (passage) {
+  if (passage.verses.length === 0) return 'N/A'
+
+  const books = {
+    40: 'Matthew',
+    41: 'Mark',
+    42: 'Luke',
+    43: 'John',
+    44: 'Acts',
+    45: 'Romans',
+    46: '1 Corinthians',
+    47: '2 Corinthians',
+    48: 'Galatians',
+    49: 'Ephesians',
+    50: 'Philippians',
+    51: 'Colossians',
+    52: '1 Thessalonians',
+    53: '2 Thessalonians',
+    54: '1 Timothy',
+    55: '2 Timothy',
+    56: 'Titus',
+    57: 'Philemon',
+    58: 'Hebrews',
+    59: 'James',
+    60: '1 Peter',
+    61: '2 Peter',
+    62: '1 John',
+    63: '2 John',
+    64: '3 John',
+    65: 'Jude',
+    66: 'Revelation',
+  }
+
+  const startId = passage.verses[0].verse_id.split('-')
+  const endId = passage.verses[passage.verses.length - 1].verse_id.split('-')
+
+  if (startId === endId) return formatVerseId(startId)
+  else return formatVerseId(startId) + '-' + formatVerseId(endId, startId)
+
+
+  function formatVerseId (id, diff) {
+    const [book, chapter, verse] = id
+    const [diffBook, diffChapter] = diff || [null, null, null]
+
+    if (book !== diffBook) {
+      return `${books[book]} ${chapter}:${verse}`
+    } else if (chapter !== diffChapter) {
+      return `${chapter}:${verse}`
+    } else {
+      return `${verse}`
+    }
   }
 }
 
