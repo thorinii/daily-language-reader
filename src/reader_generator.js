@@ -1,7 +1,13 @@
 const chunkArray = require('lodash/chunk')
 const _ = require('lodash')
 
-const { loadPassage, loadTokenFrequencyMap, isProperNoun } = require('./ognt_dataset.js')
+const {
+  loadPassage,
+  loadPassageIndex,
+  loadIndexByIds,
+  loadTokenFrequencyMap,
+  isProperNoun,
+} = require('./ognt_dataset.js')
 const { renderPassage, formatAsText, formatAsHtml } = require('./renderer.js')
 
 
@@ -11,20 +17,23 @@ async function main () {
   const frequencyMap = await loadTokenFrequencyMap()
 
   const known = []
-  const chunkLength = 50
-  const maxLearning = 5
+  const chunkLength = 100
+  const maxLearning = 10
 
-  const p = await loadPassage({ paragraph_id: 635, start: 49467, end: 49541 })
+  const lessonRange = await buildLessonRange([43], 0, 200)
+  const p = await loadPassage(lessonRange)
 
 
   const {
     rendered,
+    wordCount,
     learningWords,
     learningFraction,
     revealFraction,
   } = renderLesson(known, chunkLength, maxLearning, frequencyMap, p)
 
 
+  console.log('Word count:', wordCount)
   console.log('Learning:', learningWords.join(', '))
   console.log('Learning ratio:', (learningFraction * 100).toFixed(0) + '%')
   console.log('Reveal ratio:', (revealFraction * 100).toFixed(0) + '%')
@@ -32,6 +41,30 @@ async function main () {
   console.log(formatAsText(rendered))
   console.log()
   console.log(formatAsHtml(rendered))
+}
+
+
+async function buildLessonRange (allowedBooks, initialStart, wordLimit) {
+  const allowedRanges = await loadIndexByIds('book', allowedBooks)
+  const allowedParagraphBlocks = await Promise.all(
+    allowedRanges.map(range => loadPassageIndex('paragraph', range)))
+  const allowedParagraphs = [].concat(...allowedParagraphBlocks)
+
+  let wordCount = 0
+  let start = Number.MAX_VALUE
+  let end = -Number.MAX_VALUE
+
+  for (const paragraph of allowedParagraphs) {
+    if (paragraph.end < initialStart) continue
+
+    start = Math.min(start, paragraph.start)
+    end = Math.max(end, paragraph.end)
+    wordCount += paragraph.end - paragraph.start + 1
+
+    if (wordCount > wordLimit) break
+  }
+
+  return { start, end }
 }
 
 
@@ -94,7 +127,9 @@ function renderLesson (known, chunkLength, maxLearning, frequencyMap, passage) {
 
   return {
     rendered: rendering,
+    wordCount: passage.tokens.length,
     learningWords: [...allLearningWords],
+    seenWords: [...seenWords],
     learningFraction: allLearningWords.size / allWords.size,
     revealFraction: seenWords.size / allWords.size,
   }

@@ -81,6 +81,29 @@ function loadPassageIndex (indexName, range) {
   })
 }
 
+function loadIndexByIds (indexName, ids) {
+  return new Promise((resolve, reject) => {
+    const slices = []
+
+    chain([
+      fs.createReadStream(path.join(rawtextsPath, 'ognt_33_index_' + indexName + '.csv')),
+      csv(),
+      row => {
+        Object.keys(row).forEach(k => {
+          const v = row[k]
+          if (v && !isNaN(v)) row[k] = parseInt(v)
+        })
+        return row
+      },
+    ])
+      .on('data', row => {
+        if (ids.includes(row[indexName + '_id'])) slices.push(row)
+      })
+      .on('error', e => reject(e))
+      .on('end', () => resolve(slices))
+  })
+}
+
 
 function loadTokenFrequencyMap () {
   return new Promise((resolve, reject) => {
@@ -116,7 +139,8 @@ function isProperNoun (token) {
 
 
 module.exports = {
-  loadPassage,
+  loadPassage, loadPassageIndex,
+  loadIndexByIds,
   loadTokenFrequencyMap,
   isProperNoun,
 }
