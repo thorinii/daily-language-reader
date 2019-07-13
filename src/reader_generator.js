@@ -60,6 +60,7 @@ async function main (args) {
   } = renderLesson(known, chunkLength, maxLearning, frequencyMap, p)
 
   const reference = calculateReference(p)
+  const knownFrequency = calculateKnownFrequency(frequencyMap, known)
 
 
   await saveSeenWords(seenWords)
@@ -70,6 +71,7 @@ async function main (args) {
     console.log('GLiB lesson')
     console.log('===========')
     console.log()
+    console.log('Highest unknown frequency: >' + knownFrequency + ' times')
     console.log('Word count:', wordCount)
     console.log('Learning:', learningWords.join(', '))
     console.log('Learning ratio:', (learningFraction * 100).toFixed(0) + '%')
@@ -85,6 +87,7 @@ async function main (args) {
     console.log('<h1 style="max-width: 1000px; margin: 1em auto; line-height: 1.3">GLiB lesson ' + new Date() + '</h1>')
 
     console.log('<p style="font-size: 12pt; max-width: 1000px; margin: 1em auto; line-height: 1.3">')
+    console.log('Highest unknown frequency: >' + knownFrequency + ' times', '<br>')
     console.log('Word count:', wordCount, '<br>')
     console.log('Learning:', learningWords.join(', '), '<br>')
     console.log('Learning ratio:', (learningFraction * 100).toFixed(0) + '%', '<br>')
@@ -244,6 +247,20 @@ function calculateReference (passage) {
       return `${verse}`
     }
   }
+}
+
+function calculateKnownFrequency (frequencies, knownWords) {
+  const unknownFrequencies = { ...frequencies }
+
+  for (const word of knownWords) {
+    delete unknownFrequencies[word]
+  }
+
+  const maxFrequency = _.reduce(
+    unknownFrequencies,
+    (acc, v) => Math.max(acc, v),
+    0)
+  return maxFrequency
 }
 
 
