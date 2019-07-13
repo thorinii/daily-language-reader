@@ -45,12 +45,15 @@ async function main (args) {
     rendered,
     wordCount,
     learningWords,
+    seenWords,
     learningFraction,
     revealFraction,
   } = renderLesson(known, chunkLength, maxLearning, frequencyMap, p)
 
 
-  // TODO: save seen words list
+  await saveSeenWords(seenWords)
+
+
   // TODO: calculate known words
   // TODO: display reference
   // TODO: fix parseInt in tokens
@@ -85,6 +88,26 @@ async function main (args) {
     console.log('</body>')
     console.log('</html>')
   }
+}
+
+
+async function saveSeenWords (words) {
+  const emptyState = {
+    daysSeen: {},
+  }
+
+  await executeWithPersistentState('seen', emptyState, state => {
+    const newState = {
+      daysSeen: { ...state.daysSeen },
+    }
+
+    for (const word of words) {
+      const count = newState.daysSeen[word] || 0
+      newState.daysSeen[word] = count + 1
+    }
+
+    return { state: newState }
+  })
 }
 
 

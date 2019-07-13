@@ -4,3 +4,4 @@
 /node_modules
 index.html
 *.tar.gz
+/state_*.json
