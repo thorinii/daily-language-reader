@@ -17,9 +17,28 @@ async function main () {
   const p = await loadPassage({ paragraph_id: 635, start: 49467, end: 49541 })
 
 
+  const {
+    rendered,
+    learningWords,
+    learningFraction,
+    revealFraction,
+  } = renderLesson(known, chunkLength, maxLearning, frequencyMap, p)
+
+
+  console.log('Learning:', learningWords.join(', '))
+  console.log('Learning ratio:', (learningFraction * 100).toFixed(0) + '%')
+  console.log('Reveal ratio:', (revealFraction * 100).toFixed(0) + '%')
+  console.log()
+  console.log(formatAsText(rendered))
+  console.log()
+  console.log(formatAsHtml(rendered))
+}
+
+
+function renderLesson (known, chunkLength, maxLearning, frequencyMap, passage) {
   const tokenRendering = {}
 
-  for (const token of p.tokens) {
+  for (const token of passage.tokens) {
     if (isProperNoun(token)) {
       tokenRendering[token.token_id] = 'parallel'
     } else if (known.includes(token.normalised)) {
@@ -29,7 +48,7 @@ async function main () {
 
 
   const allLearningWords = new Set()
-  chunkArray(p.tokens, chunkLength).forEach(chunk => {
+  chunkArray(passage.tokens, chunkLength).forEach(chunk => {
     const learningWords = _.chain(chunk)
       .filter(t => !known.includes(t.normalised))
       .map(t => t.normalised)
@@ -50,7 +69,7 @@ async function main () {
     }
   })
 
-  for (const token of p.tokens) {
+  for (const token of passage.tokens) {
     if (!tokenRendering[token.token_id]) {
       tokenRendering[token.token_id] = 'translation'
     }
@@ -59,7 +78,7 @@ async function main () {
 
   const allWords = new Set()
   const seenWords = new Set()
-  for (const token of p.tokens) {
+  for (const token of passage.tokens) {
     const rendering = tokenRendering[token.token_id]
     allWords.add(token.normalised)
     if (rendering === 'native' || rendering === 'parallel') {
@@ -68,16 +87,15 @@ async function main () {
   }
 
 
-  const rendering = renderPassage(p, {
+  const rendering = renderPassage(passage, {
     divisionIndex: 'paragraph',
     tokenRendering,
   })
 
-  console.log('Learning:', [...allLearningWords].join(', '))
-  console.log('Learning ratio:', (allLearningWords.size / allWords.size * 100).toFixed(0) + '%')
-  console.log('Reveal ratio:', (seenWords.size / allWords.size * 100).toFixed(0) + '%')
-  console.log()
-  console.log(formatAsText(rendering))
-  console.log()
-  console.log(formatAsHtml(rendering))
+  return {
+    rendered: rendering,
+    learningWords: [...allLearningWords],
+    learningFraction: allLearningWords.size / allWords.size,
+    revealFraction: seenWords.size / allWords.size,
+  }
 }
