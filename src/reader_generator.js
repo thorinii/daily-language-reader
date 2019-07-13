@@ -20,10 +20,13 @@ main(process.argv.slice(2)).catch(e => console.warn('error:', e))
 
 async function main (args) {
   const allowedBooks = [43]
-  const known = []
   const chunkLength = 100
+  const minimumDaysSeen = 7
   const maxLearning = 10
   const wordLimit = 200
+
+
+  const known = await loadKnownWords(minimumDaysSeen)
 
   const lessonRange = await executeWithPersistentState('lesson', 0, async position => {
     let lessonRange = await buildLessonRange(allowedBooks, position, wordLimit)
@@ -54,7 +57,6 @@ async function main (args) {
   await saveSeenWords(seenWords)
 
 
-  // TODO: calculate known words
   // TODO: display reference
   // TODO: fix parseInt in tokens
 
@@ -111,7 +113,33 @@ async function saveSeenWords (words) {
 }
 
 
+async function loadKnownWords (minimumDaysSeen) {
+  const emptyState = {
+    daysSeen: {},
+  }
+
+  const state = await loadPersistentState('seen', emptyState)
+
+  return Object.entries(state.daysSeen)
+    .filter(([k, v]) => v >= minimumDaysSeen)
+    .map(([k]) => k)
+}
+
+
 async function executeWithPersistentState (name, initial, fn) {
+  const stateFilename = path.join(__dirname, '..', `state_${name}.json`)
+  const inputState = await loadPersistentState(name, initial)
+
+  const { state, result } = await fn(inputState)
+
+  await promisify(writeFileAtomic)(
+    stateFilename,
+    JSON.stringify(state, null, '  '))
+
+  return result
+}
+
+async function loadPersistentState (name, initial) {
   const stateFilename = path.join(__dirname, '..', `state_${name}.json`)
 
   let inputState = initial
@@ -123,13 +151,7 @@ async function executeWithPersistentState (name, initial, fn) {
     if (e.code !== 'ENOENT') throw e
   }
 
-  const { state, result } = await fn(inputState)
-
-  await promisify(writeFileAtomic)(
-    stateFilename,
-    JSON.stringify(state, null, '  '))
-
-  return result
+  return inputState
 }
 
 
