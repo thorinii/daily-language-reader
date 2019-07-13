@@ -50,20 +50,41 @@ async function main (args) {
   } = renderLesson(known, chunkLength, maxLearning, frequencyMap, p)
 
 
-  // TODO: args to switch format
   // TODO: save seen words list
   // TODO: calculate known words
   // TODO: display reference
   // TODO: fix parseInt in tokens
 
-  console.log('Word count:', wordCount)
-  console.log('Learning:', learningWords.join(', '))
-  console.log('Learning ratio:', (learningFraction * 100).toFixed(0) + '%')
-  console.log('Reveal ratio:', (revealFraction * 100).toFixed(0) + '%')
-  console.log()
-  console.log(formatAsText(rendered))
-  console.log()
-  console.log(formatAsHtml(rendered))
+  const format = args[0] === 'html' ? 'html' : 'text'
+  if (format === 'text') {
+    console.log('GLiB lesson')
+    console.log('===========')
+    console.log()
+    console.log('Word count:', wordCount)
+    console.log('Learning:', learningWords.join(', '))
+    console.log('Learning ratio:', (learningFraction * 100).toFixed(0) + '%')
+    console.log('Reveal ratio:', (revealFraction * 100).toFixed(0) + '%')
+    console.log()
+    console.log(formatAsText(rendered))
+  } else {
+    console.log('<html>')
+    console.log('<body>')
+
+    console.log('<h1 style="max-width: 1000px; margin: 1em auto; line-height: 1.3">GLiB lesson ' + new Date() + '</h1>')
+
+    console.log('<p style="font-size: 12pt; max-width: 1000px; margin: 1em auto; line-height: 1.3">')
+    console.log('Word count:', wordCount, '<br>')
+    console.log('Learning:', learningWords.join(', '), '<br>')
+    console.log('Learning ratio:', (learningFraction * 100).toFixed(0) + '%', '<br>')
+    console.log('Reveal ratio:', (revealFraction * 100).toFixed(0) + '%', '<br>')
+    console.log('</p>')
+
+    console.log('<h2 style="max-width: 1000px; margin: 1em auto; line-height: 1.3">Passage</h2>')
+    console.log(formatAsHtml(rendered))
+
+    console.log('</body>')
+    console.log('</html>')
+  }
 }
 
 

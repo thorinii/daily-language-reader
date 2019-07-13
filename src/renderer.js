@@ -86,7 +86,7 @@ function formatAsText (rendering) {
 function formatAsHtml (rendering) {
   return rendering
     .map(block => (
-      '<p style="font-size: 16pt; max-width: 50em; margin: 2em auto; line-height: 1.6">' +
+      '<p style="font-size: 16pt; max-width: 1000px; margin: 2em auto; line-height: 1.6">' +
       wrap(formatBlock(block)) +
       '</p>'))
     .join('\n')
