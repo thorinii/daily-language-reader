@@ -104,22 +104,27 @@ async function main (args) {
 
 
 async function buildLessonRange (allowedBooks, initialStart, wordLimit) {
-  const allowedRanges = await loadIndexByIds('book', allowedBooks)
+  const allowedRanges = await loadIndexByIds('book', allowedBooks.slice().sort())
   const allowedParagraphBlocks = await Promise.all(
     allowedRanges.map(range => loadPassageIndex('paragraph', range)))
   const allowedParagraphs = [].concat(...allowedParagraphBlocks)
 
   let wordCount = 0
-  let start = Number.MAX_VALUE
+  let start = null
   let end = -Number.MAX_VALUE
 
   for (const paragraph of allowedParagraphs) {
     if (paragraph.end < initialStart) continue
 
-    start = Math.min(start, paragraph.start)
-    end = Math.max(end, paragraph.end)
-    wordCount += paragraph.end - paragraph.start + 1
+    if (start === null) {
+      start = paragraph.start
+      end = paragraph.end
+    } else {
+      if (end + 1 !== paragraph.start) break
+      end = paragraph.end
+    }
 
+    wordCount += paragraph.end - paragraph.start + 1
     if (wordCount > wordLimit) break
   }
 
