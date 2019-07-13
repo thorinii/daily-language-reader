@@ -17,52 +17,54 @@ async function main () {
   const chunkLength = 20
   const maxLearning = 5
 
-  const text = await loadPassage({ paragraph_id: 635, start: 49467, end: 49541 })
-    .then(p => {
-      const tokenRendering = {}
+  const p = await loadPassage({ paragraph_id: 635, start: 49467, end: 49541 })
 
-      for (const token of p.tokens) {
-        if (isProperNoun(token)) {
-          tokenRendering[token.token_id] = 'parallel'
-        } else if (known.includes(token.normalised)) {
-          tokenRendering[token.token_id] = 'native'
-        }
+
+  const tokenRendering = {}
+
+  for (const token of p.tokens) {
+    if (isProperNoun(token)) {
+      tokenRendering[token.token_id] = 'parallel'
+    } else if (known.includes(token.normalised)) {
+      tokenRendering[token.token_id] = 'native'
+    }
+  }
+
+
+  chunkArray(p.tokens, chunkLength).forEach(chunk => {
+    const learningWords = _.chain(chunk)
+      .filter(t => !known.includes(t.normalised))
+      .map(t => t.normalised)
+      .uniq()
+      .map(t => [frequencyMap[t], t])
+      .sortBy(([fq]) => fq)
+      .reverse()
+      .take(maxLearning)
+      .map(([_, t]) => t)
+      .value()
+
+    for (const token of chunk) {
+      if (learningWords.includes(token.normalised)) {
+        tokenRendering[token.token_id] = 'parallel'
       }
+    }
+  })
+
+  for (const token of p.tokens) {
+    if (!tokenRendering[token.token_id]) {
+      tokenRendering[token.token_id] = 'translation'
+    }
+  }
 
 
-      chunkArray(p.tokens, chunkLength).forEach(chunk => {
-        const learningWords = _.chain(chunk)
-          .filter(t => !known.includes(t.normalised))
-          .map(t => t.normalised)
-          .uniq()
-          .map(t => [frequencyMap[t], t])
-          .sortBy(([fq]) => fq)
-          .reverse()
-          .take(maxLearning)
-          .map(([_, t]) => t)
-          .value()
+  const rendering = renderPassage(p, {
+    divisionIndex: 'paragraph',
+    tokenRendering,
+  })
 
-        for (const token of chunk) {
-          if (learningWords.includes(token.normalised)) {
-            tokenRendering[token.token_id] = 'parallel'
-          }
-        }
-      })
-
-      for (const token of p.tokens) {
-        if (!tokenRendering[token.token_id]) {
-          tokenRendering[token.token_id] = 'translation'
-        }
-      }
-
-
-      return formatPassageText(p, {
-        divisionIndex: 'paragraph',
-        tokenRendering,
-      })
-    })
-
-  console.log(text)
+  console.log(formatAsText(rendering))
+  console.log()
+  console.log(formatAsHtml(rendering))
 }
 
 
@@ -171,22 +173,20 @@ function loadTokenFrequencyMap () {
 
 
 /**
- * Formats a passage as plain text.
+ * Renders a passage into blocks of rendered words.
  *
  * Options: {
  *   divisionIndex: String  name of the index to use for dividing the text
+ *   tokenRendering: ID => String  type of rendering for each token
  * }
- *
- * TODO: split this into render and formatAsText
  */
-function formatPassageText (passage, options) {
+function renderPassage (passage, options) {
   const invisiblePunctation = /[ ¶]+/g
-  const allPunctation = /[“”:,.;·¶-]+/g
+  const allPunctation = /[“”:?,.;·¶-]+/g
 
   const blocks = divideBlocks(passage, options.divisionIndex || null)
   return blocks
-    .map(b => wrap(formatBlock(b, options.tokenRendering || {})))
-    .join('\n\n')
+    .map(b => formatBlock(b, options.tokenRendering || {}))
 
 
   function divideBlocks (passage, divisionIndex) {
@@ -207,21 +207,77 @@ function formatPassageText (passage, options) {
 
         const cleanTranslation = t.translation_study === '-' ? null : t.translation_study.replace(allPunctation, '').trim()
         const translation = cleanTranslation || ''
+
         const parallel = cleanTranslation
-          ? `${t.word} (${cleanTranslation})`
-          : t.word
+          ? [t.word, cleanTranslation]
+          : [t.word]
 
         const rendering = tokenRendering[t.token_id] || 'native'
         let text
-        if (rendering === 'native') text = native
-        else if (rendering === 'translation') text = translation
+        if (rendering === 'native') text = [native]
+        else if (rendering === 'translation') text = [translation]
         else text = parallel
 
-        return (
-          t.punctuation_before.replace(invisiblePunctation, '') +
-          text +
-          t.punctuation_after.replace(invisiblePunctation, '')
-        )
+        return [
+          t.punctuation_before.replace(invisiblePunctation, ''),
+          text,
+          t.punctuation_after.replace(invisiblePunctation, ''),
+        ]
+      })
+  }
+}
+
+function formatAsText (rendering) {
+  return rendering
+    .map(block => wrap(formatBlock(block)))
+    .join('\n\n')
+
+
+  function formatBlock (stream) {
+    return stream
+      .map(word => {
+        return word
+          .map(piece => {
+            if (Array.isArray(piece)) {
+              return piece.map((s, idx) => {
+                if (idx !== 0) return '(' + s + ')'
+                else return s
+              }).join(' ')
+            } else {
+              return piece
+            }
+          })
+          .join('')
+      })
+      .filter(text => !!text)
+      .join(' ')
+  }
+}
+
+function formatAsHtml (rendering) {
+  return rendering
+    .map(block => (
+      '<p style="font-size: 16pt; max-width: 50em; margin: auto; line-height: 1.6">' +
+      wrap(formatBlock(block)) +
+      '</p>'))
+    .join('\n')
+
+
+  function formatBlock (stream) {
+    return stream
+      .map(word => {
+        return word
+          .map(piece => {
+            if (Array.isArray(piece) && piece.length > 1) {
+              return (
+                '<span style="display: inline-block; text-align: center; padding-bottom: 12px">' +
+                piece.filter(p => p).map((p, idx) => idx > 0 ? `<span style="color: grey; line-height: 1">${p}</span>` : p).join('<br>') +
+                '</span>')
+            } else if (piece !== '') {
+              return '<span style="vertical-align: top">' + piece + '</span>'
+            }
+          })
+          .join('')
       })
       .filter(text => !!text)
       .join(' ')
