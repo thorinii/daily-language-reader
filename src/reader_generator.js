@@ -1,3 +1,7 @@
+const fs = require('fs')
+const path = require('path')
+const { promisify } = require('util')
+const writeFileAtomic = require('write-file-atomic')
 const chunkArray = require('lodash/chunk')
 const _ = require('lodash')
 
@@ -11,19 +15,27 @@ const {
 const { renderPassage, formatAsText, formatAsHtml } = require('./renderer.js')
 
 
-main().catch(e => console.warn('error:', e))
+main(process.argv.slice(2)).catch(e => console.warn('error:', e))
 
-async function main () {
-  const frequencyMap = await loadTokenFrequencyMap()
 
+async function main (args) {
+  const allowedBooks = [43]
   const known = []
   const chunkLength = 100
   const maxLearning = 10
+  const wordLimit = 200
 
-  const lessonRange = await buildLessonRange([43], 0, 200)
+  const lessonRange = await executeWithPersistentState('lesson', 0, async position => {
+    const lessonRange = await buildLessonRange(allowedBooks, position, wordLimit)
+    return {
+      state: lessonRange.end + 1,
+      result: lessonRange,
+    }
+  })
   const p = await loadPassage(lessonRange)
 
 
+  const frequencyMap = await loadTokenFrequencyMap()
   const {
     rendered,
     wordCount,
@@ -33,6 +45,13 @@ async function main () {
   } = renderLesson(known, chunkLength, maxLearning, frequencyMap, p)
 
 
+  // TODO: wrap position around if no paragraphs
+  // TODO: args to switch format
+  // TODO: save seen words list
+  // TODO: calculate known words
+  // TODO: display reference
+  // TODO: fix parseInt in tokens
+
   console.log('Word count:', wordCount)
   console.log('Learning:', learningWords.join(', '))
   console.log('Learning ratio:', (learningFraction * 100).toFixed(0) + '%')
@@ -41,6 +60,28 @@ async function main () {
   console.log(formatAsText(rendered))
   console.log()
   console.log(formatAsHtml(rendered))
+}
+
+
+async function executeWithPersistentState (name, initial, fn) {
+  const stateFilename = path.join(__dirname, '..', `state_${name}.json`)
+
+  let inputState = initial
+
+  try {
+    const content = await promisify(fs.readFile)(stateFilename)
+    if (content !== '') inputState = JSON.parse(content)
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e
+  }
+
+  const { state, result } = await fn(inputState)
+
+  await promisify(writeFileAtomic)(
+    stateFilename,
+    JSON.stringify(state, null, '  '))
+
+  return result
 }
 
 
