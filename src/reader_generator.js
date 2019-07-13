@@ -1,7 +1,3 @@
-const fs = require('fs')
-const path = require('path')
-const { promisify } = require('util')
-const writeFileAtomic = require('write-file-atomic')
 const chunkArray = require('lodash/chunk')
 const _ = require('lodash')
 
@@ -12,7 +8,17 @@ const {
   loadTokenFrequencyMap,
   isProperNoun,
 } = require('./ognt_dataset.js')
-const { renderPassage, formatAsText, formatAsHtml } = require('./renderer.js')
+
+const {
+  loadPersistentState,
+  executeWithPersistentState,
+} = require('./persistence.js')
+
+const {
+  renderPassage,
+  formatAsText,
+  formatAsHtml,
+} = require('./renderer.js')
 
 
 main(process.argv.slice(2)).catch(e => console.warn('error:', e))
@@ -90,68 +96,6 @@ async function main (args) {
     console.log('</body>')
     console.log('</html>')
   }
-}
-
-
-async function saveSeenWords (words) {
-  const emptyState = {
-    daysSeen: {},
-  }
-
-  await executeWithPersistentState('seen', emptyState, state => {
-    const newState = {
-      daysSeen: { ...state.daysSeen },
-    }
-
-    for (const word of words) {
-      const count = newState.daysSeen[word] || 0
-      newState.daysSeen[word] = count + 1
-    }
-
-    return { state: newState }
-  })
-}
-
-
-async function loadKnownWords (minimumDaysSeen) {
-  const emptyState = {
-    daysSeen: {},
-  }
-
-  const state = await loadPersistentState('seen', emptyState)
-
-  return Object.entries(state.daysSeen)
-    .filter(([k, v]) => v >= minimumDaysSeen)
-    .map(([k]) => k)
-}
-
-
-async function executeWithPersistentState (name, initial, fn) {
-  const stateFilename = path.join(__dirname, '..', `state_${name}.json`)
-  const inputState = await loadPersistentState(name, initial)
-
-  const { state, result } = await fn(inputState)
-
-  await promisify(writeFileAtomic)(
-    stateFilename,
-    JSON.stringify(state, null, '  '))
-
-  return result
-}
-
-async function loadPersistentState (name, initial) {
-  const stateFilename = path.join(__dirname, '..', `state_${name}.json`)
-
-  let inputState = initial
-
-  try {
-    const content = await promisify(fs.readFile)(stateFilename)
-    if (content !== '') inputState = JSON.parse(content)
-  } catch (e) {
-    if (e.code !== 'ENOENT') throw e
-  }
-
-  return inputState
 }
 
 
@@ -244,4 +188,37 @@ function renderLesson (known, chunkLength, maxLearning, frequencyMap, passage) {
     learningFraction: allLearningWords.size / allWords.size,
     revealFraction: seenWords.size / allWords.size,
   }
+}
+
+
+async function saveSeenWords (words) {
+  const emptyState = {
+    daysSeen: {},
+  }
+
+  await executeWithPersistentState('seen', emptyState, state => {
+    const newState = {
+      daysSeen: { ...state.daysSeen },
+    }
+
+    for (const word of words) {
+      const count = newState.daysSeen[word] || 0
+      newState.daysSeen[word] = count + 1
+    }
+
+    return { state: newState }
+  })
+}
+
+
+async function loadKnownWords (minimumDaysSeen) {
+  const emptyState = {
+    daysSeen: {},
+  }
+
+  const state = await loadPersistentState('seen', emptyState)
+
+  return Object.entries(state.daysSeen)
+    .filter(([k, v]) => v >= minimumDaysSeen)
+    .map(([k]) => k)
 }
