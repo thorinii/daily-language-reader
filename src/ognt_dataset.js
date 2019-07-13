@@ -41,10 +41,8 @@ function loadPassageTokens (range) {
       fs.createReadStream(path.join(rawtextsPath, 'ognt_33_tokens.csv')),
       csv(),
       row => {
-        Object.keys(row).forEach(k => {
-          const v = row[k]
-          if (v && !isNaN(v)) row[k] = parseInt(v)
-        })
+        row.token_id = parseInt(row.token_id)
+        row.translation_index = parseInt(row.translation_index)
         return row
       },
     ])
@@ -64,10 +62,12 @@ function loadPassageIndex (indexName, range) {
       fs.createReadStream(path.join(rawtextsPath, 'ognt_33_index_' + indexName + '.csv')),
       csv(),
       row => {
-        Object.keys(row).forEach(k => {
-          const v = row[k]
-          if (v && !isNaN(v)) row[k] = parseInt(v)
-        })
+        if (!['chapter', 'verse'].includes(indexName)) {
+          row[indexName + '_id'] = parseInt(row[indexName + '_id'])
+        }
+
+        row.start = parseInt(row.start)
+        row.end = parseInt(row.end)
         return row
       },
     ])
@@ -89,10 +89,12 @@ function loadIndexByIds (indexName, ids) {
       fs.createReadStream(path.join(rawtextsPath, 'ognt_33_index_' + indexName + '.csv')),
       csv(),
       row => {
-        Object.keys(row).forEach(k => {
-          const v = row[k]
-          if (v && !isNaN(v)) row[k] = parseInt(v)
-        })
+        if (!['chapter', 'verse'].includes(indexName)) {
+          row[indexName + '_id'] = parseInt(row[indexName + '_id'])
+        }
+
+        row.start = parseInt(row.start)
+        row.end = parseInt(row.end)
         return row
       },
     ])
@@ -113,10 +115,8 @@ function loadTokenFrequencyMap () {
       fs.createReadStream(path.join(rawtextsPath, 'ognt_33_tokens.csv')),
       csv(),
       row => {
-        Object.keys(row).forEach(k => {
-          const v = row[k]
-          if (v && !isNaN(v)) row[k] = parseInt(v)
-        })
+        row.token_id = parseInt(row.token_id)
+        row.translation_index = parseInt(row.translation_index)
         return row
       },
     ])

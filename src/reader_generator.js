@@ -65,8 +65,6 @@ async function main (args) {
   await saveSeenWords(seenWords)
 
 
-  // TODO: fix parseInt in tokens
-
   const format = args[0] === 'html' ? 'html' : 'text'
   if (format === 'text') {
     console.log('GLiB lesson')
