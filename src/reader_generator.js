@@ -8,7 +8,20 @@ const rawtextsPath = path.join(__dirname, '../rawtexts')
 
 
 loadPassage({ paragraph_id: 635, start: 49467, end: 49541 })
-  .then(p => formatPassageText(p, { divisionIndex: 'paragraph' }))
+  .then(p => {
+    const tokenRendering = {}
+
+    for (const token of p.tokens) {
+      if (isProperNoun(token)) {
+        tokenRendering[token.token_id] = 'parallel'
+      }
+    }
+
+    return formatPassageText(p, {
+      divisionIndex: 'paragraph',
+      tokenRendering
+    })
+  })
   .then(text => console.log(text), e => console.warn('error:', e))
 
 
@@ -97,9 +110,12 @@ function loadPassageIndex (indexName, range) {
  */
 function formatPassageText (passage, options) {
   const invisiblePunctation = /[¶]+/g
+  const allPunctation = /[-,.;·¶]+/g
 
   const blocks = divideBlocks(passage, options.divisionIndex || null)
-  return blocks.map(b => wrap(formatBlock(b))).join('\n\n')
+  return blocks
+    .map(b => wrap(formatBlock(b, options.tokenRendering || {})))
+    .join('\n\n')
 
 
   function divideBlocks (passage, divisionIndex) {
@@ -113,13 +129,35 @@ function formatPassageText (passage, options) {
   }
 
 
-  function formatBlock (tokens) {
-    return tokens.map(t => {
-      return (
-        t.punctuation_before.replace(invisiblePunctation, '') +
-        t.word +
-        t.punctuation_after.replace(invisiblePunctation, '')
-      )
-    }).join(' ')
+  function formatBlock (tokens, tokenRendering) {
+    return tokens
+      .map(t => {
+        const native = t.word
+
+        const cleanTranslation = t.translation_study === '-' ? null : t.translation_study.replace(allPunctation, '')
+        const translation = cleanTranslation || ''
+        const parallel = cleanTranslation
+          ? `${t.word} (${cleanTranslation})`
+          : t.word
+
+        const rendering = tokenRendering[t.token_id] || 'native'
+        let text
+        if (rendering === 'native') text = native
+        else if (rendering === 'translation') text = translation
+        else text = parallel
+
+        return (
+          t.punctuation_before.replace(invisiblePunctation, '') +
+          text +
+          t.punctuation_after.replace(invisiblePunctation, '')
+        )
+      })
+      .filter(text => !!text)
+      .join(' ')
   }
+}
+
+
+function isProperNoun (token) {
+  return /^N-.*-[LPT][GI]?$/.test(token.rmac)
 }
