@@ -2,12 +2,14 @@ const fs   = require('fs')
 const path = require('path')
 const csv  = require('csv-parser')
 const {chain}  = require('stream-chain')
+const wrap = require('wordwrap')(80)
 
 const rawtextsPath = path.join(__dirname, '../rawtexts')
 
 
-loadPassage({ paragraph_id: 635, start: 49467, end: 49471 })
-  .then(ts => console.log(ts), e => console.warn('error:', e))
+loadPassage({ paragraph_id: 635, start: 49467, end: 49541 })
+  .then(p => formatPassageText(p, { divisionIndex: 'paragraph' }))
+  .then(text => console.log(text), e => console.warn('error:', e))
 
 
 async function loadPassage (range) {
@@ -83,4 +85,41 @@ function loadPassageIndex (indexName, range) {
       .on('error', e => reject(e))
       .on('end', () => resolve(slices))
   })
+}
+
+
+/**
+ * Formats a passage as plain text.
+ *
+ * Options: {
+ *   divisionIndex: String  name of the index to use for dividing the text
+ * }
+ */
+function formatPassageText (passage, options) {
+  const invisiblePunctation = /[¶]+/g
+
+  const blocks = divideBlocks(passage, options.divisionIndex || null)
+  return blocks.map(b => wrap(formatBlock(b))).join('\n\n')
+
+
+  function divideBlocks (passage, divisionIndex) {
+    if (divisionIndex === null) return [passage.tokens]
+    const index = passage[divisionIndex + 's']
+
+    return index.map(slice => {
+      return passage.tokens.filter(t =>
+        t.token_id >= slice.start && t.token_id <= slice.end)
+    })
+  }
+
+
+  function formatBlock (tokens) {
+    return tokens.map(t => {
+      return (
+        t.punctuation_before.replace(invisiblePunctation, '') +
+        t.word +
+        t.punctuation_after.replace(invisiblePunctation, '')
+      )
+    }).join(' ')
+  }
 }
