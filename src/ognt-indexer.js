@@ -5,6 +5,8 @@ const {parser} = require('stream-json')
 const {streamArray} = require('stream-json/streamers/StreamArray')
 const csvWriteStream = require('csv-write-stream')
 
+const { normalise } = require('./normalise')
+
 
 const rawtextsPath = path.join(__dirname, '../rawtexts')
 
@@ -54,6 +56,7 @@ chain([
       verse: row.Verse,
       clause_id: row.LevinsohnClauseID,
       word: row.OGNTa,
+      normalised: normalise(row.OGNTa),
       lexeme: row.lexeme,
       rmac: row.rmac,
       translation_interlinear: row.IT,
@@ -80,6 +83,7 @@ chain([
       tokenStream.write({
         token_id: row.token_id,
         word: row.word,
+        normalised: row.normalised,
         lexeme: row.lexeme,
         rmac: row.rmac,
         translation_interlinear: row.translation_interlinear,
