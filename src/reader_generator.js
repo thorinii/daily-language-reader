@@ -1,28 +1,69 @@
-const fs   = require('fs')
+const fs = require('fs')
 const path = require('path')
-const csv  = require('csv-parser')
-const {chain}  = require('stream-chain')
+const csv = require('csv-parser')
+const { chain } = require('stream-chain')
 const wrap = require('wordwrap')(80)
+const chunkArray = require('lodash/chunk')
+const _ = require('lodash')
 
 const rawtextsPath = path.join(__dirname, '../rawtexts')
 
+main().catch(e => console.warn('error:', e))
 
-loadPassage({ paragraph_id: 635, start: 49467, end: 49541 })
-  .then(p => {
-    const tokenRendering = {}
+async function main () {
+  const frequencyMap = await loadTokenFrequencyMap()
 
-    for (const token of p.tokens) {
-      if (isProperNoun(token)) {
-        tokenRendering[token.token_id] = 'parallel'
+  const known = []
+  const chunkLength = 20
+  const maxLearning = 5
+
+  const text = await loadPassage({ paragraph_id: 635, start: 49467, end: 49541 })
+    .then(p => {
+      const tokenRendering = {}
+
+      for (const token of p.tokens) {
+        if (isProperNoun(token)) {
+          tokenRendering[token.token_id] = 'parallel'
+        } else if (known.includes(token.normalised)) {
+          tokenRendering[token.token_id] = 'native'
+        }
       }
-    }
 
-    return formatPassageText(p, {
-      divisionIndex: 'paragraph',
-      tokenRendering
+
+      chunkArray(p.tokens, chunkLength).forEach(chunk => {
+        const learningWords = _.chain(chunk)
+          .filter(t => !known.includes(t.normalised))
+          .map(t => t.normalised)
+          .uniq()
+          .map(t => [frequencyMap[t], t])
+          .sortBy(([fq]) => fq)
+          .reverse()
+          .take(maxLearning)
+          .map(([_, t]) => t)
+          .value()
+
+        for (const token of chunk) {
+          if (learningWords.includes(token.normalised)) {
+            tokenRendering[token.token_id] = 'parallel'
+          }
+        }
+      })
+
+      for (const token of p.tokens) {
+        if (!tokenRendering[token.token_id]) {
+          tokenRendering[token.token_id] = 'translation'
+        }
+      }
+
+
+      return formatPassageText(p, {
+        divisionIndex: 'paragraph',
+        tokenRendering,
+      })
     })
-  })
-  .then(text => console.log(text), e => console.warn('error:', e))
+
+  console.log(text)
+}
 
 
 async function loadPassage (range) {
@@ -65,7 +106,7 @@ function loadPassageTokens (range) {
           if (v && !isNaN(v)) row[k] = parseInt(v)
         })
         return row
-      }
+      },
     ])
       .on('data', row => {
         if (ids.has(row.token_id)) tokens.push(row)
@@ -88,7 +129,7 @@ function loadPassageIndex (indexName, range) {
           if (v && !isNaN(v)) row[k] = parseInt(v)
         })
         return row
-      }
+      },
     ])
       .on('data', row => {
         if (row.start <= range.end && row.end >= range.start) {
@@ -101,16 +142,46 @@ function loadPassageIndex (indexName, range) {
 }
 
 
+function loadTokenFrequencyMap () {
+  return new Promise((resolve, reject) => {
+    const counts = {}
+
+    chain([
+      fs.createReadStream(path.join(rawtextsPath, 'ognt_33_tokens.csv')),
+      csv(),
+      row => {
+        Object.keys(row).forEach(k => {
+          const v = row[k]
+          if (v && !isNaN(v)) row[k] = parseInt(v)
+        })
+        return row
+      },
+    ])
+      .on('data', row => {
+        if (counts[row.normalised]) {
+          counts[row.normalised] = counts[row.normalised] + 1
+        } else {
+          counts[row.normalised] = 1
+        }
+      })
+      .on('error', e => reject(e))
+      .on('end', () => resolve(counts))
+  })
+}
+
+
 /**
  * Formats a passage as plain text.
  *
  * Options: {
  *   divisionIndex: String  name of the index to use for dividing the text
  * }
+ *
+ * TODO: split this into render and formatAsText
  */
 function formatPassageText (passage, options) {
-  const invisiblePunctation = /[¶]+/g
-  const allPunctation = /[-,.;·¶]+/g
+  const invisiblePunctation = /[ ¶]+/g
+  const allPunctation = /[“”:,.;·¶-]+/g
 
   const blocks = divideBlocks(passage, options.divisionIndex || null)
   return blocks
@@ -134,7 +205,7 @@ function formatPassageText (passage, options) {
       .map(t => {
         const native = t.word
 
-        const cleanTranslation = t.translation_study === '-' ? null : t.translation_study.replace(allPunctation, '')
+        const cleanTranslation = t.translation_study === '-' ? null : t.translation_study.replace(allPunctation, '').trim()
         const translation = cleanTranslation || ''
         const parallel = cleanTranslation
           ? `${t.word} (${cleanTranslation})`
