@@ -26,7 +26,12 @@ async function main (args) {
   const wordLimit = 200
 
   const lessonRange = await executeWithPersistentState('lesson', 0, async position => {
-    const lessonRange = await buildLessonRange(allowedBooks, position, wordLimit)
+    let lessonRange = await buildLessonRange(allowedBooks, position, wordLimit)
+
+    if (lessonRange.start > lessonRange.end) {
+      lessonRange = await buildLessonRange(allowedBooks, 0, wordLimit)
+    }
+
     return {
       state: lessonRange.end + 1,
       result: lessonRange,
@@ -45,7 +50,6 @@ async function main (args) {
   } = renderLesson(known, chunkLength, maxLearning, frequencyMap, p)
 
 
-  // TODO: wrap position around if no paragraphs
   // TODO: args to switch format
   // TODO: save seen words list
   // TODO: calculate known words
