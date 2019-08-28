@@ -10,7 +10,26 @@ const EXTENSIVE_WORD_COUNT = 100
 main(process.argv.slice(2)).catch(e => console.warn('error:', e))
 
 async function main (args) {
+  // PUMP FEEDER
+  // progress to recall
+  // add new learn
+  // add new achieved verses
+
+  // LOAD LESSON
+  // learning
+  // recall scheduler
+  // load achieved verses and near achieved
+  // load reading passage
+  // calculate stats
   const lesson = makeLesson()
+
+  // RENDER LESSON
+  // load verse text (ESV, greek, mixed)
+  // format lesson
+
+  // POST PROCESSING
+  // CSS inlining
+
   console.log(renderLessonText(lesson))
 }
 
@@ -25,7 +44,7 @@ function makeLesson () {
           {
             reference: 'Matthew 13:28',
             text: '',
-            inline: '',
+            mixed: '',
           },
         ],
       },
@@ -37,7 +56,7 @@ function makeLesson () {
           {
             reference: '1 Timothy 2:8',
             text: '',
-            inline: '',
+            mixed: '',
             translation: '',
           },
         ],
@@ -52,7 +71,7 @@ function makeLesson () {
           {
             reference: '1 Timothy 2:8',
             text: '',
-            inline: '',
+            mixed: '',
             translation: '',
           },
         ],
@@ -63,13 +82,13 @@ function makeLesson () {
         fraction: 1,
         reference: '1 Timothy 2:8',
         text: '',
-        inline: '',
+        mixed: '',
       },
       {
         fraction: 0.92,
         reference: 'Philemon 1:3',
         text: '',
-        inline: '',
+        mixed: '',
       },
     ],
     extensiveReading: {
@@ -82,6 +101,10 @@ function makeLesson () {
       versesAchieved: 11,
       islandKnownFraction: 0.3,
     },
+    attributions: [
+      'ESV',
+      'OpenGNT',
+    ],
   }
 }
 
@@ -132,12 +155,17 @@ function renderLessonText (lesson) {
   text += lesson.statistics.versesAchieved + ' verses achieved\n'
   text += (100 * lesson.statistics.islandKnownFraction).toFixed(0) + '% known of island\n'
 
+  text += '\n\n'
+
+  text += '## Attributions\n'
+  text += lesson.attributions.join('\n\n')
+
   return text.trim()
 }
 
 function renderVerse (verse) {
   return verse.reference + '\n' +
-    [verse.text, verse.inline, verse.translation]
+    [verse.text, verse.mixed, verse.translation]
       .filter(t => t)
       .join('\n')
 }
