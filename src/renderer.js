@@ -44,7 +44,7 @@ function renderPassage (passage, options) {
         const rendering = tokenRendering[t.token_id] || 'native'
         let text
         if (rendering === 'native') text = native
-        else if (rendering === 'translation' && translation) text = [1, t.word, translation]
+        else if (rendering === 'translation' && translation) text = translation
         else text = parallel
 
         return [
@@ -87,7 +87,7 @@ function formatAsText (rendering) {
 function formatAsHtml (rendering) {
   return rendering
     .map(block => (
-      '<p style="font-size: 16pt; max-width: 1000px; margin: 2em auto; line-height: 1.6">' +
+      '<p class="p">' +
       wrap(formatBlock(block)) +
       '</p>'))
     .join('\n')
@@ -102,11 +102,11 @@ function formatAsHtml (rendering) {
               const highlight = piece[0]
               piece = piece.slice(1)
               return (
-                '<span style="display: inline-block; text-align: center; padding-bottom: 12px">' +
-                piece.filter(p => p).map((p, idx) => idx !== highlight ? `<span style="color: #aaaaaa; line-height: 1">${p}</span>` : p).join('<br>') +
+                '<span class="word-par">' +
+                piece.filter(p => p).map((p, idx) => idx !== highlight ? `<span class="word-par-high">${p}</span>` : p).join('<br>') +
                 '</span>')
             } else if (piece !== '') {
-              return '<span style="vertical-align: top">' + piece + '</span>'
+              return '<span class="word-ser">' + piece + '</span>'
             }
           })
           .join('')

@@ -25,153 +25,12 @@ const {
 main(process.argv.slice(2)).catch(e => console.warn('error:', e))
 
 
-const NEW_WORDS_PER_DAY = 3
-const MAX_WORDS_LEARNING = 10
-const LEARNING_INTERVAL = 4
-const MAX_SIMULTANEOUS_RECALL = 6
-const EXAMPLES_PER_WORD = 5
-const ISLAND = ['1 John']
-const EXTENSIVE_WORD_COUNT = 100
-
-const lesson = {
-  date: new Date(),
-  recall: [
-    {
-      word: 'tau',
-      examples: [
-        {
-          reference: 'Matthew 13:28',
-          text: '',
-          inline: '',
-        },
-      ],
-    },
-    {
-      word: 'ksero',
-      definition: 'I know, as in, I know where he is / ksero pou ine',
-      translations: ['know', 'I know', 'am knowing'],
-      examples: [
-        {
-          reference: '1 Timothy 2:8',
-          text: '',
-          inline: '',
-          translation: '',
-        },
-      ],
-    },
-  ],
-  learn: [
-    {
-      word: 'ksero',
-      definition: 'I know, as in, I know where he is / ksero pou ine',
-      translations: ['know', 'I know', 'am knowing'],
-      examples: [
-        {
-          reference: '1 Timothy 2:8',
-          text: '',
-          inline: '',
-          translation: '',
-        },
-      ],
-    },
-  ],
-  achievedVerses: [
-    {
-      fraction: 1,
-      reference: '1 Timothy 2:8',
-      text: '',
-      inline: '',
-    },
-    {
-      fraction: 0.92,
-      reference: 'Philemon 1:3',
-      text: '',
-      inline: '',
-    },
-  ],
-  extensiveReading: {
-    reference: '1 John 1:4-13',
-    text: '',
-  },
-  statistics: {
-    wordsLearning: 7,
-    wordsKnown: 32,
-    versesAchieved: 11,
-    islandKnownFraction: 0.3,
-  },
-}
-
-function renderLessonText (lesson) {
-  let text = ''
-  text += '# GLiB lesson - ' + formatDate(lesson.date) + '\n'
-  text += '\n'
-
-  text += '## Recall\n'
-  text += lesson.recall.map(w => {
-    return '### ' + w.word +
-      w.examples.map(e => '\n' + renderVerse(e))
-        .join('\n')
-  })
-    .join('\n')
-
-  text += '\n\n'
-
-  text += '## Learn\n'
-  text += lesson.learn.map(w => {
-    return '### ' + w.word + '\n' +
-      'Definition: ' + w.definition + '\n' +
-      'Translations: ' + w.translations.join('; ') + '\n' +
-      w.examples.map(e => '\n' + renderVerse(e))
-        .join('\n')
-  })
-    .join('\n')
-
-  text += '\n\n'
-
-  text += '## Achieved verses\n'
-  text += lesson.achievedVerses.map(v => {
-    return renderVerse(v)
-  })
-    .join('\n\n')
-
-  text += '\n\n'
-
-  text += '## Reading\n'
-  text += renderVerse(lesson.extensiveReading)
-
-  text += '\n\n'
-
-  text += '## Stats\n'
-  text += lesson.statistics.wordsLearning + ' words learning\n'
-  text += lesson.statistics.wordsKnown + ' words known\n'
-  text += lesson.statistics.versesAchieved + ' verses achieved\n'
-  text += (100 * lesson.statistics.islandKnownFraction).toFixed(0) + '% known of island\n'
-
-  return text.trim()
-}
-
-function renderVerse (verse) {
-  return verse.reference + '\n' +
-    [verse.text, verse.inline, verse.translation]
-      .filter(t => t)
-      .join('\n')
-}
-
-function formatDate (d) {
-  return '' + d.getFullYear() +
-    ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()] +
-    ' ' + d.getDate()
-}
-
-console.log(renderLessonText(lesson))
-
-
 async function main (args) {
-  const allowedBooks = [43]
+  const allowedBooks = [62]
   const chunkLength = 100
   const minimumDaysSeen = 7
   const maxLearning = 10
-  const wordLimit = 200
+  const wordLimit = 100
 
 
   const known = await loadKnownWords(minimumDaysSeen)
@@ -226,9 +85,19 @@ async function main (args) {
     console.log('<html>')
     console.log('<body>')
 
-    console.log('<h1 style="max-width: 1000px; margin: 1em auto; line-height: 1.3">GLiB lesson ' + new Date() + '</h1>')
+    console.log('<style>')
+    console.log('h1, h2, h3 { max-width: 1000px; margin: 1em auto; line-height: 1.3; }')
+    console.log('p { font-size: 16pt; max-width: 1000px; margin: 1em auto; }')
+    console.log('.description { line-height: 1.3; }')
+    console.log('.p { margin: 2em auto; line-height: 1.6; }')
+    console.log('.word-par { display: inline-block; text-align: center; padding-bottom: 12px; }')
+    console.log('.word-par-high { color: #aaaaaa; line-height: 1; }')
+    console.log('.word-ser { vertical-align: top; }')
+    console.log('</style>')
 
-    console.log('<p style="font-size: 12pt; max-width: 1000px; margin: 1em auto; line-height: 1.3">')
+    console.log('<h1>GLiB lesson ' + new Date() + '</h1>')
+
+    console.log('<p class="description">')
     console.log('Highest unknown frequency: >' + knownFrequency + ' times', '<br>')
     console.log('Word count:', wordCount, '<br>')
     console.log('Learning:', learningWords.join(', '), '<br>')
@@ -236,7 +105,7 @@ async function main (args) {
     console.log('Reveal ratio:', (revealFraction * 100).toFixed(0) + '%', '<br>')
     console.log('</p>')
 
-    console.log('<h2 style="max-width: 1000px; margin: 1em auto; line-height: 1.3">' + reference + '</h2>')
+    console.log('<h2>' + reference + '</h2>')
     console.log(formatAsHtml(rendered))
 
     console.log('</body>')
@@ -248,7 +117,7 @@ async function main (args) {
 async function buildLessonRange (allowedBooks, initialStart, wordLimit) {
   const allowedRanges = await loadIndexByIds('book', allowedBooks.slice().sort())
   const allowedParagraphBlocks = await Promise.all(
-    allowedRanges.map(range => loadPassageIndex('paragraph', range)))
+    allowedRanges.map(range => loadPassageIndex('sentence', range)))
   const allowedParagraphs = [].concat(...allowedParagraphBlocks)
 
   let wordCount = 0
@@ -279,7 +148,7 @@ function renderLesson (known, chunkLength, maxLearning, frequencyMap, passage) {
 
   for (const token of passage.tokens) {
     if (isProperNoun(token)) {
-      tokenRendering[token.token_id] = 'parallel'
+      tokenRendering[token.token_id] = 'native'
     } else if (known.includes(token.normalised)) {
       tokenRendering[token.token_id] = 'native'
     }
@@ -304,6 +173,7 @@ function renderLesson (known, chunkLength, maxLearning, frequencyMap, passage) {
     for (const token of chunk) {
       if (learningWords.includes(token.normalised)) {
         tokenRendering[token.token_id] = 'parallel'
+        tokenRendering[token.token_id] = 'native'
       }
     }
   })
