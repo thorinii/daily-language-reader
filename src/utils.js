@@ -16,7 +16,7 @@ function readStdinWords () {
   return readStdin().split(/\s+/).filter(t => t)
 }
 
-const clauses = require('./rawtexts/OpenGNT_TranslationByClause.json')
+const clauses = require('../rawtexts/OpenGNT_TranslationByClause.json')
   .map((clause, idx) => {
     clause.id = idx
     return clause

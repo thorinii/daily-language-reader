@@ -38,13 +38,13 @@ function renderPassage (passage, options) {
         const translation = cleanTranslation || ''
 
         const parallel = cleanTranslation
-          ? [t.word, cleanTranslation]
-          : [t.word]
+          ? [0, t.word, cleanTranslation]
+          : t.word
 
         const rendering = tokenRendering[t.token_id] || 'native'
         let text
-        if (rendering === 'native') text = [native]
-        else if (rendering === 'translation') text = [translation]
+        if (rendering === 'native') text = native
+        else if (rendering === 'translation' && translation) text = [1, t.word, translation]
         else text = parallel
 
         return [
@@ -68,6 +68,7 @@ function formatAsText (rendering) {
         return word
           .map(piece => {
             if (Array.isArray(piece)) {
+              piece = piece.slice(1)
               return piece.map((s, idx) => {
                 if (idx !== 0) return '(' + s + ')'
                 else return s
@@ -98,9 +99,11 @@ function formatAsHtml (rendering) {
         return word
           .map(piece => {
             if (Array.isArray(piece) && piece.length > 1) {
+              const highlight = piece[0]
+              piece = piece.slice(1)
               return (
                 '<span style="display: inline-block; text-align: center; padding-bottom: 12px">' +
-                piece.filter(p => p).map((p, idx) => idx > 0 ? `<span style="color: grey; line-height: 1">${p}</span>` : p).join('<br>') +
+                piece.filter(p => p).map((p, idx) => idx !== highlight ? `<span style="color: #aaaaaa; line-height: 1">${p}</span>` : p).join('<br>') +
                 '</span>')
             } else if (piece !== '') {
               return '<span style="vertical-align: top">' + piece + '</span>'
