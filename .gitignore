@@ -5,3 +5,4 @@
 index.html
 *.tar.gz
 /state_*.json
+/*.csv
